@@ -163,5 +163,12 @@ The interface uses a frame-based animation system:
 - No new external dependencies (reuses existing Rich/Textual)
 - Self-contained within existing architecture
 - Compatible with current build system
+- **Cross-compatible**: Works with different Textual versions (no ScrollView dependency)
+
+## Compatibility Notes
+- Simplified widget architecture for broad Textual version compatibility
+- Single `Static` widget approach instead of complex multi-widget layout
+- Removed deprecated `ScrollView` import that caused issues in newer Textual versions
+- Uses standard `set_interval` method available across Textual versions
 
 This implementation provides immediate visual feedback about hardware health and activity, making TT-SMI more engaging and informative for real-time monitoring tasks.
