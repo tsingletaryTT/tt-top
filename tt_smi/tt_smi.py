@@ -53,6 +53,7 @@ from tt_tools_common.ui_common.widgets import (
     TTHostCompatibilityMenu,
     TTHelperMenuBox,
 )
+from tt_smi.tt_top_widget import TTLiveMonitor
 
 # Global variables
 TextualKeyBindings = List[Tuple[str, str, str]]
@@ -78,6 +79,7 @@ class TTSMI(App):
         ("1", "tab_one", "Device info tab"),
         ("2", "tab_two", "Telemetry tab"),
         ("3", "tab_three", "Firmware tab"),
+        ("4", "tab_four", "Live monitor tab"),
     ]
 
     try:
@@ -126,7 +128,7 @@ class TTSMI(App):
                     data=get_host_compatibility_info(),
                 )
             with TabbedContent(
-                "Information (1)", "Telemetry (2)", "FW Version (3)", id="tab_container"
+                "Information (1)", "Telemetry (2)", "FW Version (3)", "Live Monitor (4)", id="tab_container"
             ):
                 yield TTDataTable(
                     title="Device Information",
@@ -145,6 +147,10 @@ class TTSMI(App):
                     id="tt_smi_firmware",
                     header=constants.FIRMWARES_TABLE_HEADER,
                     header_height=2,
+                )
+                yield TTLiveMonitor(
+                    id="tt_live_monitor",
+                    backend=self.backend,
                 )
         yield Footer()
 
@@ -650,6 +656,10 @@ class TTSMI(App):
         """Switch to read-only tab"""
         self.query_one(TabbedContent).active = "tab-3"
 
+    def action_tab_four(self) -> None:
+        """Switch to live monitor tab"""
+        self.query_one(TabbedContent).active = "tab-4"
+
     def action_help(self) -> None:
         """Pop up the help menu"""
         tt_confirm_box = TTHelperMenuBox(
@@ -681,6 +691,9 @@ class TTSMI(App):
 
         if tab_id == "tab-2":  # Telemetry tab
             # Dispatch the telemetry thread
+            await self.dispatch_telem_thread()
+        elif tab_id == "tab-4":  # Live Monitor tab
+            # Ensure telemetry thread is running for live monitor
             await self.dispatch_telem_thread()
 
 def parse_args():
