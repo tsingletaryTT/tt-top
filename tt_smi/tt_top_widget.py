@@ -52,24 +52,164 @@ class TTTopDisplay(Static):
         """Render the complete TT-Top display as a single string"""
         lines = []
 
-        # Header (plain text to avoid markup conflicts)
-        lines.append("TT-TOP: Real-time Hardware Monitor")
-        lines.append("=" * 50)
+        # Sick cyberpunk header
+        lines.append("    ███████╗███████╗      ████████╗ ██████╗ ██████╗ ")
+        lines.append("    ╚══██╔══╝╚══██╔══╝      ╚══██╔══╝██╔═══██╗██╔══██╗")
+        lines.append("       ██║      ██║   █████╗  ██║   ██║   ██║██████╔╝")
+        lines.append("       ██║      ██║   ╚════╝  ██║   ██║   ██║██╔═══╝ ")
+        lines.append("       ██║      ██║            ██║   ╚██████╔╝██║     ")
+        lines.append("       ╚═╝      ╚═╝            ╚═╝    ╚═════╝ ╚═╝     ")
+        lines.append("")
+        lines.append("    ╔══════════════════════════════════════════════════╗")
+        lines.append("    ║          REAL-TIME HARDWARE MONITOR             ║")
+        lines.append("    ╚══════════════════════════════════════════════════╝")
         lines.append("")
 
-        # Top section: Grid and Flow side by side
-        grid_panel = self._create_chip_grid()
-        flow_panel = self._create_flow_visualization()
-
-        # Combine panels horizontally
-        lines.extend(self._combine_panels_horizontally(grid_panel, flow_panel))
-        lines.append("")
-
-        # Bottom section: Process table
-        table_content = self._create_process_table()
-        lines.append(table_content)
+        # Create the unified display with perfect alignment
+        display_content = self._create_unified_display()
+        lines.extend(display_content)
 
         return "\n".join(lines)
+
+    def _create_unified_display(self) -> List[str]:
+        """Create a unified display with perfect ASCII art alignment"""
+        lines = []
+
+        # Main container with no right border for that leet look
+        lines.append("    ╔════════════════════════════════════════════════════════════════════════════════════╗")
+        lines.append("    ║ HARDWARE MATRIX ∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎")
+        lines.append("    ╠════════════════════════════════════════════════════════════════════════════════════╣")
+
+        # Hardware topology section
+        for i, device in enumerate(self.backend.devices):
+            device_name = self.backend.get_device_name(device)
+            board_type = self.backend.device_infos[i].get('board_type', 'Unknown')
+            telem = self.backend.device_telemetrys[i]
+
+            power = float(telem.get('power', '0.0'))
+            temp = float(telem.get('asic_temperature', '0.0'))
+            current = float(telem.get('current', '0.0'))
+            voltage = float(telem.get('voltage', '0.0'))
+
+            # Activity indicators with sick symbols
+            if power > 50:
+                activity = "██████████"  # Full power bars
+                status_char = "⚡"
+            elif power > 25:
+                activity = "██████░░░░"  # High power
+                status_char = "◆"
+            elif power > 10:
+                activity = "███░░░░░░░"  # Medium power
+                status_char = "◇"
+            else:
+                activity = "░░░░░░░░░░"  # Low power
+                status_char = "○"
+
+            # Temperature status
+            if temp > 80:
+                temp_status = "🔥CRIT"
+            elif temp > 65:
+                temp_status = "🌡HOT "
+            elif temp > 45:
+                temp_status = "🌡WARM"
+            else:
+                temp_status = "❄COOL"
+
+            # Create flow visualization
+            flow_intensity = min(int(current / 5), 20)
+            if flow_intensity > 15:
+                flow_pattern = "▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶"[:flow_intensity]
+            elif flow_intensity > 10:
+                flow_pattern = "▷▷▷▷▷▷▷▷▷▷▷▷▷▷▷▷▷▷▷▷"[:flow_intensity]
+            elif flow_intensity > 5:
+                flow_pattern = "▸▸▸▸▸▸▸▸▸▸▸▸▸▸▸▸▸▸▸▸"[:flow_intensity]
+            else:
+                flow_pattern = "▹▹▹▹▹▹▹▹▹▹▹▹▹▹▹▹▹▹▹▹"[:flow_intensity]
+
+            # Add animation offset
+            offset = (self.animation_frame + i * 3) % len(flow_pattern) if flow_pattern else 0
+            if flow_pattern:
+                animated_flow = flow_pattern[offset:] + flow_pattern[:offset]
+                animated_flow = animated_flow.ljust(20)
+            else:
+                animated_flow = "∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙"
+
+            # Main device line with perfect alignment
+            device_line = f"    ║ [{i:2d}] {device_name:10s} {status_char} {activity} {animated_flow} {temp_status}"
+            lines.append(device_line)
+
+            # Detail line with technical specs
+            detail_line = f"    ║     ╰─> {board_type:8s} │ {voltage:5.2f}V │ {current:6.1f}A │ {power:6.1f}W │ {temp:5.1f}°C"
+            lines.append(detail_line)
+
+            if i < len(self.backend.devices) - 1:
+                lines.append("    ║     ∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙")
+
+        # Separator with sick ASCII
+        lines.append("    ╠════════════════════════════════════════════════════════════════════════════════════╣")
+        lines.append("    ║ PROCESS MATRIX ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓")
+        lines.append("    ╠════════════════════════════════════════════════════════════════════════════════════╣")
+
+        # Process table header with perfect spacing
+        lines.append("    ║ ID │ DEVICE     │ BOARD  │ VOLTAGE │ CURRENT │ POWER   │ TEMP    │ STATUS")
+        lines.append("    ║════┼════════════┼════════┼═════════┼═════════┼═════════┼═════════┼════════════════")
+
+        # Create device data sorted by power
+        device_data = []
+        for i, device in enumerate(self.backend.devices):
+            device_name = self.backend.get_device_name(device)
+            board_type = self.backend.device_infos[i].get('board_type', 'N/A')[:6]
+            telem = self.backend.device_telemetrys[i]
+
+            voltage = float(telem.get('voltage', '0.0'))
+            current = float(telem.get('current', '0.0'))
+            power = float(telem.get('power', '0.0'))
+            temp = float(telem.get('asic_temperature', '0.0'))
+
+            # Status with sick symbols
+            if temp > 85:
+                status = "🚨 CRITICAL"
+            elif temp > 75:
+                status = "🔥 OVERHEATING"
+            elif power > 75:
+                status = "⚡ HIGH_LOAD"
+            elif power > 25:
+                status = "🟢 ACTIVE"
+            elif power > 5:
+                status = "🟡 IDLE"
+            else:
+                status = "💤 SLEEP"
+
+            device_data.append((i, device_name, board_type, voltage, current, power, temp, status))
+
+        # Sort by power consumption
+        device_data.sort(key=lambda x: x[5], reverse=True)
+
+        # Add process rows with perfect alignment
+        for i, device_name, board_type, voltage, current, power, temp, status in device_data:
+            # Power visualization
+            power_blocks = "█" * int(power / 10) + "░" * (10 - int(power / 10))
+
+            line = f"    ║ {i:2d} │ {device_name[:10]:10s} │ {board_type:6s} │ {voltage:7.2f}V │ {current:7.1f}A │ {power:7.1f}W │ {temp:7.1f}°C │ {status}"
+            lines.append(line)
+
+            # Add a subtle power bar under each entry
+            power_line = f"    ║    │            │        │         │         │ {power_blocks} │         │"
+            lines.append(power_line)
+
+        # Footer with legend and sick ASCII
+        lines.append("    ╠════════════════════════════════════════════════════════════════════════════════════╣")
+        lines.append("    ║ LEGEND: ⚡High Load  ◆Active  ◇Moderate  ○Idle  🔥Critical  🌡Hot  ❄Cool")
+        lines.append("    ║ FLOWS:  ▶▶High Traffic  ▷▷Medium  ▸▸Low  ▹▹Minimal  ∙∙Inactive")
+        lines.append("    ║ POWER:  ██Full  ░░Empty  │ Real-time refresh every 100ms")
+        lines.append("    ╚════════════════════════════════════════════════════════════════════════════════════╝")
+
+        # Add some cyber footer
+        lines.append("")
+        lines.append("    ░░▒▒▓▓██ NEURAL LINK ESTABLISHED ██▓▓▒▒░░")
+        lines.append(f"    ░░▒▒▓▓██ FRAME: {self.animation_frame:06d} ██▓▓▒▒░░")
+
+        return lines
 
     def _create_chip_grid(self) -> List[str]:
         """Create the chip grid visualization"""
