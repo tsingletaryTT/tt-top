@@ -52,8 +52,9 @@ class TTTopDisplay(Static):
         """Render the complete TT-Top display as a single string"""
         lines = []
 
-        # Header
-        lines.append("[bold blue]TT-TOP: Real-time Hardware Monitor[/bold blue]")
+        # Header (plain text to avoid markup conflicts)
+        lines.append("TT-TOP: Real-time Hardware Monitor")
+        lines.append("=" * 50)
         lines.append("")
 
         # Top section: Grid and Flow side by side
@@ -88,36 +89,30 @@ class TTTopDisplay(Static):
             temp = float(telem.get('asic_temperature', '0.0'))
             power = float(telem.get('power', '0.0'))
 
-            # Activity symbol
+            # Activity symbol (plain text)
             if power > 50:
-                activity_symbol = "[bold red]●[/bold red]"
+                activity_symbol = "●"  # High activity
             elif power > 20:
-                activity_symbol = "[bold yellow]◐[/bold yellow]"
+                activity_symbol = "◐"  # Moderate activity
             elif power > 5:
-                activity_symbol = "[bold green]○[/bold green]"
+                activity_symbol = "○"  # Low activity
             else:
-                activity_symbol = "[dim]○[/dim]"
+                activity_symbol = "·"  # Idle
 
-            # Temperature indicator
+            # Temperature indicator (plain text)
             if temp > 80:
-                temp_color = "[bold red]🔥[/bold red]"
+                temp_color = "🔥"
             elif temp > 60:
-                temp_color = "[bold yellow]🌡️[/bold yellow]"
+                temp_color = "🌡"
             elif temp > 40:
-                temp_color = "[bold green]🌡️[/bold green]"
+                temp_color = "🌡"
             else:
-                temp_color = "[bold cyan]❄️[/bold cyan]"
+                temp_color = "❄"
 
-            # Power bar
+            # Power bar (simplified to avoid markup conflicts)
             bar_length = 8
             filled = int((power / 100) * bar_length)
-            bar = "█" * filled + "░" * (bar_length - filled)
-            if power > 75:
-                power_bar = f"[bold red]{bar}[/bold red]"
-            elif power > 50:
-                power_bar = f"[bold yellow]{bar}[/bold yellow]"
-            else:
-                power_bar = f"[bold green]{bar}[/bold green]"
+            power_bar = "█" * filled + "░" * (bar_length - filled)
 
             # Format lines
             chip_line = f"│ [{i:2}] {device_name:10} {activity_symbol} {temp_color}│"
@@ -164,12 +159,7 @@ class TTTopDisplay(Static):
                 result = ""
                 for j, char in enumerate(extended_pattern):
                     if j % (11 - flow_intensity) == 0:
-                        if flow_intensity > 7:
-                            result += f"[bold red]{char}[/bold red]"
-                        elif flow_intensity > 4:
-                            result += f"[bold yellow]{char}[/bold yellow]"
-                        else:
-                            result += f"[bold green]{char}[/bold green]"
+                        result += char  # Plain text without color markup
                     else:
                         result += " "
                 flow_chars = result[:width]
@@ -239,10 +229,26 @@ class TTTopDisplay(Static):
         for data in device_data:
             i, device_name, board_type, voltage, current, power, temp, aiclk, status = data
 
-            power_str = f"[bold red]{power:6.1f}W[/bold red]" if power > 50 else f"{power:6.1f}W"
-            temp_str = f"[bold red]{temp:5.1f}°C[/bold red]" if temp > 75 else f"{temp:5.1f}°C"
+            power_str = f"{power:6.1f}W"
+            temp_str = f"{temp:5.1f}°C"
 
-            line = f"│ {i:2} │ {device_name[:10]:10} │ {board_type:6} │ {voltage:6.2f}V │ {current:6.1f}A │ {power_str:>8} │ {temp_str:>8} │ {aiclk:6}MHz │ {status:>9} │"
+            # Create the line without embedded markup for table alignment
+            line = f"│ {i:2} │ {device_name[:10]:10} │ {board_type:6} │ {voltage:6.2f}V │ {current:6.1f}A │ {power_str:>7} │ {temp_str:>7} │ {aiclk:6}MHz │"
+
+            # Add status separately to avoid markup conflicts
+            if temp > 85:
+                line += " CRITICAL │"
+            elif temp > 75:
+                line += " HOT      │"
+            elif power > 75:
+                line += " HIGH LOAD│"
+            elif power > 25:
+                line += " ACTIVE   │"
+            elif power > 5:
+                line += " IDLE     │"
+            else:
+                line += " SLEEP    │"
+
             lines.append(line)
 
         lines.append("└────┴────────────┴────────┴─────────┴─────────┴─────────┴─────────┴─────────┴──────────┘")
