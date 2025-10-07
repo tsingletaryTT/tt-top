@@ -804,7 +804,7 @@ class TTTopDisplay(Static):
         lines.append("┌─ HARDWARE STATUS ────── ┌─ MEMORY STATUS ──── ┌─ REAL-TIME METRICS")
         lines.append(f"│ DEVICES: {active_devices}/{total_devices} ACTIVE     │ DDR TRAINED: {ddr_trained_count}/{total_devices}   │ TOTAL PWR: {total_power:5.1f}W")
         lines.append(f"│ ARC HEARTBEATS: {arc_status}     │ CHANNELS: MONITORING │ AVG TEMP: {avg_temp:5.1f}°C")
-        lines.append(f"│ TELEMETRY: {:06d}      │ SPEED: REALTIME     │ AVG AICLK: {avg_aiclk:4.0f}MHz".format(self.animation_frame))
+        lines.append(f"│ TELEMETRY: {self.animation_frame:06d}      │ SPEED: REALTIME     │ AVG AICLK: {avg_aiclk:4.0f}MHz")
         lines.append("└─────────────────────── └─────────────────── └──────────────────")
 
         return lines
