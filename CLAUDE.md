@@ -308,4 +308,41 @@ The interface now speaks directly to hardware engineers:
 The transition from marketing-speak to engineering precision fundamentally improved the tool's credibility. Engineers need accurate, immediate feedback about their hardware - not flashy animations. By making the TENSTORRENT logo respond to actual thermal conditions and replacing buzzwords with precise technical language, the interface became a proper engineering tool that engineers can trust for critical hardware monitoring tasks.
 **─────────────────────────────────────────────────**
 
+## CLI Direct Launch Option
+
+### Implementation Complete
+Added `--top` / `-t` CLI flag to launch TT-SMI directly into live monitor mode:
+
+```bash
+# Launch directly into TT-Top mode
+python3 -m tt_smi --top
+# or
+python3 -m tt_smi -t
+```
+
+### Technical Implementation
+- **Argument Parser**: Added `--top` boolean flag to `parse_args()` in `tt_smi.py:808-813`
+- **TTSMI Class**: Added `start_top_mode` parameter to constructor in `tt_smi.py:105,114`
+- **Tab Switching**: Implemented automatic tab switch to "tab-4" (Live Monitor) in `on_mount()` method at `tt_smi.py:176-178`
+- **Integration**: Passed flag through `tt_smi_main()` function at `tt_smi.py:847-853`
+
+```python
+# CLI argument definition
+parser.add_argument(
+    "-t",
+    "--top",
+    default=False,
+    action="store_true",
+    help="Launch directly into live monitor mode (tt-top)",
+)
+
+# Automatic tab switching on startup
+if self.start_top_mode:
+    self.query_one(TabbedContent).active = "tab-4"
+```
+
+**★ Insight ─────────────────────────────────────**
+This completes the full TT-Top implementation with direct CLI access for immediate hardware monitoring. Engineers can now bypass the standard TT-SMI interface and go directly to the live monitoring view, making the tool more efficient for rapid hardware diagnostics and continuous monitoring scenarios.
+**─────────────────────────────────────────────────**
+
 This project successfully created a professional hardware monitoring tool that combines visual appeal with engineering accuracy. The final implementation provides a clean TENSTORRENT-branded interface, hardware-responsive visual elements, comprehensive telemetry logging, and precise technical language that engineers can rely on for serious hardware analysis work.

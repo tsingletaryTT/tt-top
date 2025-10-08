@@ -102,6 +102,7 @@ class TTSMI(App):
         backend: TTSMIBackend = None,
         snapshot: bool = False,
         show_sidebar: bool = True,
+        start_top_mode: bool = False,
     ) -> None:
         """Initialize the textual app."""
         super().__init__()
@@ -110,6 +111,7 @@ class TTSMI(App):
         self.backend = backend
         self.snapshot = snapshot
         self.show_sidebar = show_sidebar
+        self.start_top_mode = start_top_mode
         self.result_filename = result_filename
         self.text_theme = create_tt_tools_theme()
 
@@ -170,6 +172,10 @@ class TTSMI(App):
 
         left_sidebar = self.query_one("#left_col")
         left_sidebar.display = self.show_sidebar
+
+        # Switch to live monitor tab if --top flag was used
+        if self.start_top_mode:
+            self.query_one(TabbedContent).active = "tab-4"
 
     def update_telem_table(self) -> None:
         """Update telemetry table"""
@@ -803,6 +809,13 @@ def parse_args():
         action="store_true",
         help="Don't detect devices post reset.",
     )
+    parser.add_argument(
+        "-t",
+        "--top",
+        default=False,
+        action="store_true",
+        help="Launch directly into live monitor mode (tt-top)",
+    )
     args = parser.parse_args()
     return args
 
@@ -841,6 +854,7 @@ def tt_smi_main(backend: TTSMIBackend, args):
         snapshot=args.snapshot,
         result_filename=args.filename,
         show_sidebar=not args.compact,
+        start_top_mode=args.top,
     )
     tt_smi_app.run()
 
