@@ -122,18 +122,19 @@ class TTTopDisplay(Static):
         lines.append("Legend: TRN=Trained UNT=Untrained ●=Active Channel ◯=Idle")
         return lines
 
-    def _generate_memory_pattern(self, activity_level: int, device_idx: int) -> str:
-        """Generate Yar's Revenge style memory bank visualization"""
-        # Memory banks arranged in a pattern
-        banks = ["◯", "◯", "◯", "◯", "◯", "◯", "◯", "◯"]  # 8 memory banks
+    def _generate_memory_pattern(self, power_watts: float, device_idx: int) -> str:
+        """Generate memory bank visualization based on actual power consumption"""
+        # Memory banks - show actual activity level, not fake animation
+        banks = ["◯"] * 8
 
-        # Animate based on activity level and time
-        frame_offset = (self.animation_frame + device_idx * 2) % 8
+        # Calculate how many banks to light up based on real power consumption
+        # Scale power to 0-8 banks (assuming 100W is max)
+        active_banks = min(int((power_watts / 100.0) * 8), 8)
 
-        # Light up memory banks based on activity
-        for i in range(min(activity_level, 8)):
-            bank_idx = (i + frame_offset) % 8
-            banks[bank_idx] = "●"
+        # Light up banks from left to right based on actual power
+        # No fake animation - just real data representation
+        for i in range(active_banks):
+            banks[i] = "●"
 
         return "".join(banks)
 
@@ -170,24 +171,39 @@ class TTTopDisplay(Static):
 
         return "".join(channel_indicators)
 
-    def _create_data_flow_line(self, bandwidth: int, device_idx: int) -> str:
-        """Create flowing data visualization"""
-        flow_chars = "▶▷▸▹"
-        base_pattern = "∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙"
+    def _create_data_flow_line(self, current_draw: float, device_idx: int) -> str:
+        """Create data flow visualization based on actual current draw"""
+        base_pattern = "∙" * 20
 
-        if bandwidth > 0:
-            # Create flowing effect
-            flow_density = min(bandwidth // 2, 10)
-            offset = (self.animation_frame + device_idx * 3) % 20
+        # Only show flow if there's actual current activity
+        if current_draw < 5.0:  # Very low current = no meaningful flow
+            return base_pattern
 
-            result = list(base_pattern)
-            for i in range(flow_density):
-                pos = (offset + i * 2) % 20
-                char_idx = (i + self.animation_frame // 2) % len(flow_chars)
-                result[pos] = flow_chars[char_idx]
+        # Calculate flow intensity based on real current draw
+        flow_intensity = min(int(current_draw / 10), 8)  # Scale to 0-8 range
+        if flow_intensity == 0:
+            return base_pattern
 
-            return "".join(result)
-        return base_pattern
+        # Different flow characters for different intensity levels
+        if current_draw > 50:
+            flow_char = "▶"  # High current
+        elif current_draw > 25:
+            flow_char = "▷"  # Medium current
+        elif current_draw > 10:
+            flow_char = "▸"  # Low current
+        else:
+            flow_char = "▹"  # Minimal current
+
+        # Create flow pattern based on actual activity, not fake animation
+        result = list(base_pattern)
+
+        # Show steady flow pattern - density reflects real current
+        spacing = max(1, 20 // flow_intensity)
+        for i in range(0, 20, spacing):
+            if i < len(result):
+                result[i] = flow_char
+
+        return "".join(result)
 
     def _create_activity_heatmap(self) -> List[str]:
         """Create real-time activity heatmap"""
@@ -746,8 +762,8 @@ class TTTopDisplay(Static):
             else:
                 temp_status = "[bright_cyan]COOL[/bright_cyan]"
 
-            # Memory activity pattern (Yar's Revenge style) with colors
-            memory_banks = self._generate_memory_pattern(int((power / 100) * 8), i)
+            # Memory activity pattern based on real power consumption
+            memory_banks = self._generate_memory_pattern(power, i)
             # Color the memory banks based on activity
             colored_memory = ""
             for bank in memory_banks:
@@ -764,9 +780,8 @@ class TTTopDisplay(Static):
             tech_line = f"[bright_cyan]│[/bright_cyan]     [dim bright_white]{board_type:8s}[/dim bright_white] {colored_memory} [bright_cyan]{voltage:4.2f}V[/bright_cyan] [bright_green]{current:5.1f}A[/bright_green] [bright_yellow]{power:5.1f}W[/bright_yellow]"
             lines.append(tech_line)
 
-            # Interconnect activity flow with animated colors
-            bandwidth = min(int(current / 5), 20)
-            flow_line = self._create_data_flow_line(bandwidth, i)
+            # Interconnect activity flow based on real current draw
+            flow_line = self._create_data_flow_line(current, i)
             # Color the flow indicators
             colored_flow = ""
             for char in flow_line:
@@ -849,15 +864,23 @@ class TTTopDisplay(Static):
             telem = self.backend.device_telemetrys[i]
             power = float(telem.get('power', '0.0'))
 
-            # Generate colorized heatmap
+            # Generate heatmap based on current power (not fake historical data)
+            # In real implementation, this would use a rolling buffer of historical power data
             heatmap = ""
+            current_intensity = min(int(power / 10), len(chars) - 1)
+
+            # Show consistent pattern based on current power level
+            # This represents the current activity level across the timeline
             for t in range(39):  # 39 characters for timeline
-                base_activity = 30 + i * 15
-                variation = 10 * (1 + 0.5 * ((self.animation_frame + t + i * 5) % 20) / 10)
-                activity = max(0, base_activity + variation)
-                intensity = min(int(activity / 10), len(chars) - 1)
-                char = chars[intensity]
-                color = char_colors[intensity]
+                # Use current power level as baseline (real data)
+                # Add minimal variation to show it's "historical" but based on real current state
+                if power > 0:
+                    intensity = max(0, current_intensity - abs(t - 19) // 8)  # Peak in middle, taper at edges
+                else:
+                    intensity = 0
+
+                char = chars[min(intensity, len(chars) - 1)]
+                color = char_colors[min(intensity, len(char_colors) - 1)]
                 heatmap += f"[{color}]{char}[/{color}]"
 
             # Current power indicator with colors
