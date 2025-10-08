@@ -686,19 +686,19 @@ class TTTopDisplay(Static):
         return "\n".join(lines)
 
     def _create_bbs_header(self) -> List[str]:
-        """Create BBS-style header with pixelated hardware avatar - borderless right side"""
+        """Create BBS-style header with cyberpunk colors - borderless right side"""
         lines = []
 
-        # Retro BBS-style header with no right borders (leet ANSI style)
-        lines.append("    ╔══════════════════════════════════════════════════════════════════════════════")
-        lines.append("    ║  ▄▄▄▄▄▄▄   TT-SYSMON v3.0 - NEURAL INTERFACE ONLINE   ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄")
-        lines.append("    ║ ████▓▓▓██                                           ██████████████████▓▓")
-        lines.append("    ║ ██▓░░░▓██  ┌─ TENSTORRENT MATRIX GRID ─┐          ████▓▓░░██░░▓▓████▓▓")
-        lines.append("    ║ ██▓░█░▓██  │ REAL-TIME TELEMETRY GRID  │          ████▓▓░░██░░▓▓████▓▓")
-        lines.append("    ║ ██▓░░░▓██  │ INTERCONNECT FLOW MATRIX  │          ████▓▓░░██░░▓▓████▓▓")
-        lines.append("    ║ ████▓▓▓██  │ MEMORY TOPOLOGY SCANNER   │          ██████████████████▓▓")
-        lines.append("    ║  ▀▀▀▀▀▀▀   └───────────────────────────┘           ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀")
-        lines.append("    ╚══════════════════════════════════════════════════════════════════════════════")
+        # Cyberpunk BBS-style header with tasteful colors
+        lines.append("    [bold bright_cyan]╔══════════════════════════════════════════════════════════════════════════════[/bold bright_cyan]")
+        lines.append("    [bold bright_cyan]║[/bold bright_cyan]  [bright_magenta]▄▄▄▄▄▄▄[/bright_magenta]   [bold bright_white]TT-SYSMON v3.0 - [/bold bright_white][bold yellow]NEURAL INTERFACE ONLINE[/bold yellow]   [bright_magenta]▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄[/bright_magenta]")
+        lines.append("    [bold bright_cyan]║[/bold bright_cyan] [bright_magenta]████▓▓▓██[/bright_magenta]                                           [bright_magenta]██████████████████▓▓[/bright_magenta]")
+        lines.append("    [bold bright_cyan]║[/bold bright_cyan] [bright_magenta]██▓[/bright_magenta][dim white]░░░[/dim white][bright_magenta]▓██[/bright_magenta]  [bright_cyan]┌─ TENSTORRENT MATRIX GRID ─┐[/bright_cyan]          [bright_magenta]████▓▓[/bright_magenta][dim white]░░[/dim white][bright_magenta]██[/bright_magenta][dim white]░░[/dim white][bright_magenta]▓▓████▓▓[/bright_magenta]")
+        lines.append("    [bold bright_cyan]║[/bold bright_cyan] [bright_magenta]██▓[/bright_magenta][dim white]░[/dim white][bright_green]█[/bright_green][dim white]░[/dim white][bright_magenta]▓██[/bright_magenta]  [bright_cyan]│[/bright_cyan] [bright_white]REAL-TIME TELEMETRY GRID[/bright_white]  [bright_cyan]│[/bright_cyan]          [bright_magenta]████▓▓[/bright_magenta][dim white]░░[/dim white][bright_magenta]██[/bright_magenta][dim white]░░[/dim white][bright_magenta]▓▓████▓▓[/bright_magenta]")
+        lines.append("    [bold bright_cyan]║[/bold bright_cyan] [bright_magenta]██▓[/bright_magenta][dim white]░░░[/dim white][bright_magenta]▓██[/bright_magenta]  [bright_cyan]│[/bright_cyan] [bright_white]INTERCONNECT FLOW MATRIX[/bright_white]  [bright_cyan]│[/bright_cyan]          [bright_magenta]████▓▓[/bright_magenta][dim white]░░[/dim white][bright_magenta]██[/bright_magenta][dim white]░░[/dim white][bright_magenta]▓▓████▓▓[/bright_magenta]")
+        lines.append("    [bold bright_cyan]║[/bold bright_cyan] [bright_magenta]████▓▓▓██[/bright_magenta]  [bright_cyan]│[/bright_cyan] [bright_white]MEMORY TOPOLOGY SCANNER[/bright_white]   [bright_cyan]│[/bright_cyan]          [bright_magenta]██████████████████▓▓[/bright_magenta]")
+        lines.append("    [bold bright_cyan]║[/bold bright_cyan]  [bright_magenta]▀▀▀▀▀▀▀[/bright_magenta]   [bright_cyan]└───────────────────────────┘[/bright_cyan]           [bright_magenta]▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀[/bright_magenta]")
+        lines.append("    [bold bright_cyan]╚══════════════════════════════════════════════════════════════════════════════[/bold bright_cyan]")
 
         return lines
 
@@ -706,11 +706,11 @@ class TTTopDisplay(Static):
         """Create main BBS-style display with terminal aesthetic - borderless right side"""
         lines = []
 
-        # BBS-style system status header (borderless right)
-        lines.append("┌─────────────────────────── SYSTEM STATUS")
-        lines.append("│")
+        # BBS-style system status header (borderless right) with cyberpunk colors
+        lines.append("[bright_cyan]┌─────────────────────────── [bold bright_white]SYSTEM STATUS[/bold bright_white][/bright_cyan]")
+        lines.append("[bright_cyan]│[/bright_cyan]")
 
-        # Hardware grid in retro style
+        # Hardware grid in retro style with colors
         for i, device in enumerate(self.backend.devices):
             device_name = self.backend.get_device_name(device)[:10]  # Truncate to fit
             board_type = self.backend.device_infos[i].get('board_type', 'Unknown')[:8]
@@ -721,53 +721,70 @@ class TTTopDisplay(Static):
             current = float(telem.get('current', '0.0'))
             voltage = float(telem.get('voltage', '0.0'))
 
-            # Retro terminal-style status indicators
+            # Colorized status indicators based on power levels
             if power > 50:
-                status_block = "██████████"
-                status_icon = "◉"
+                status_block = "[bold red]██████████[/bold red]"
+                status_icon = "[bold red]◉[/bold red]"
             elif power > 25:
-                status_block = "██████▓▓▓▓"
-                status_icon = "◎"
+                status_block = "[bold yellow]██████[/bold yellow][dim white]▓▓▓▓[/dim white]"
+                status_icon = "[bold yellow]◎[/bold yellow]"
             elif power > 10:
-                status_block = "████▓▓▓▓▓▓"
-                status_icon = "○"
+                status_block = "[bright_green]████[/bright_green][dim white]▓▓▓▓▓▓[/dim white]"
+                status_icon = "[bright_green]○[/bright_green]"
             else:
-                status_block = "▓▓▓▓▓▓▓▓▓▓"
-                status_icon = "·"
+                status_block = "[dim white]▓▓▓▓▓▓▓▓▓▓[/dim white]"
+                status_icon = "[dim white]·[/dim white]"
 
-            # Temperature readout in terminal style
+            # Temperature readout with color coding
             temp_display = f"{temp:05.1f}°C"
             if temp > 80:
-                temp_status = "CRIT"
+                temp_status = "[bold red]CRIT[/bold red]"
             elif temp > 65:
-                temp_status = " HOT"
+                temp_status = "[bold yellow] HOT[/bold yellow]"
             elif temp > 45:
-                temp_status = "WARM"
+                temp_status = "[bright_yellow]WARM[/bright_yellow]"
             else:
-                temp_status = "COOL"
+                temp_status = "[bright_cyan]COOL[/bright_cyan]"
 
-            # Memory activity pattern (Yar's Revenge style)
+            # Memory activity pattern (Yar's Revenge style) with colors
             memory_banks = self._generate_memory_pattern(int((power / 100) * 8), i)
+            # Color the memory banks based on activity
+            colored_memory = ""
+            for bank in memory_banks:
+                if bank == "●":
+                    colored_memory += "[bright_magenta]●[/bright_magenta]"
+                else:
+                    colored_memory += "[dim white]◯[/dim white]"
 
-            # Create BBS-style device entry (no right border)
-            device_line = f"│ [{i}] {device_name:10s} {status_icon} │{status_block}│ {temp_display} {temp_status}"
+            # Create BBS-style device entry with colors
+            device_line = f"[bright_cyan]│[/bright_cyan] [bright_white][[/bright_white][bright_yellow]{i}[/bright_yellow][bright_white]][/bright_white] [bold bright_white]{device_name:10s}[/bold bright_white] {status_icon} [bright_cyan]│[/bright_cyan]{status_block}[bright_cyan]│[/bright_cyan] [bright_white]{temp_display}[/bright_white] {temp_status}"
             lines.append(device_line)
 
-            # Technical readout line (no right border)
-            tech_line = f"│     {board_type:8s} {memory_banks} {voltage:4.2f}V {current:5.1f}A {power:5.1f}W"
+            # Technical readout line with subtle colors
+            tech_line = f"[bright_cyan]│[/bright_cyan]     [dim bright_white]{board_type:8s}[/dim bright_white] {colored_memory} [bright_cyan]{voltage:4.2f}V[/bright_cyan] [bright_green]{current:5.1f}A[/bright_green] [bright_yellow]{power:5.1f}W[/bright_yellow]"
             lines.append(tech_line)
 
-            # Interconnect activity flow (no right border)
+            # Interconnect activity flow with animated colors
             bandwidth = min(int(current / 5), 20)
             flow_line = self._create_data_flow_line(bandwidth, i)
-            activity_line = f"│     DATA: {flow_line}"
+            # Color the flow indicators
+            colored_flow = ""
+            for char in flow_line:
+                if char in "▶▷":
+                    colored_flow += f"[bright_magenta]{char}[/bright_magenta]"
+                elif char in "▸▹":
+                    colored_flow += f"[bright_cyan]{char}[/bright_cyan]"
+                else:
+                    colored_flow += f"[dim white]{char}[/dim white]"
+
+            activity_line = f"[bright_cyan]│[/bright_cyan]     [dim bright_white]DATA:[/dim bright_white] {colored_flow}"
             lines.append(activity_line)
 
             if i < len(self.backend.devices) - 1:
-                lines.append("│ ·······································································")
+                lines.append("[bright_cyan]│[/bright_cyan] [dim white]·······································································[/dim white]")
 
-        lines.append("│")
-        lines.append("└───────────────────────────────────────────────────────────────────────")
+        lines.append("[bright_cyan]│[/bright_cyan]")
+        lines.append("[bright_cyan]└───────────────────────────────────────────────────────────────────────[/bright_cyan]")
 
         # Add temporal heatmap section in BBS style
         lines.append("")
@@ -801,72 +818,90 @@ class TTTopDisplay(Static):
         avg_aiclk = sum(float(self.backend.device_telemetrys[i].get('aiclk', '0'))
                        for i in range(total_devices)) / max(total_devices, 1)
 
-        lines.append("┌─ HARDWARE STATUS ────── ┌─ MEMORY STATUS ──── ┌─ REAL-TIME METRICS")
-        lines.append(f"│ DEVICES: {active_devices}/{total_devices} ACTIVE     │ DDR TRAINED: {ddr_trained_count}/{total_devices}   │ TOTAL PWR: {total_power:5.1f}W")
-        lines.append(f"│ ARC HEARTBEATS: {arc_status}     │ CHANNELS: MONITORING │ AVG TEMP: {avg_temp:5.1f}°C")
-        lines.append(f"│ TELEMETRY: {self.animation_frame:06d}      │ SPEED: REALTIME     │ AVG AICLK: {avg_aiclk:4.0f}MHz")
-        lines.append("└─────────────────────── └─────────────────── └──────────────────")
+        lines.append("[bright_cyan]┌─ [bold bright_white]HARDWARE STATUS[/bold bright_white] ────── [bright_cyan]┌─ [bold bright_white]MEMORY STATUS[/bold bright_white] ──── [bright_cyan]┌─ [bold bright_white]REAL-TIME METRICS[/bold bright_white][/bright_cyan]")
+
+        # Color code device status
+        device_status_color = "bright_green" if active_devices == total_devices else "bright_yellow" if active_devices > 0 else "red"
+        ddr_status_color = "bright_green" if ddr_trained_count == total_devices else "bright_yellow" if ddr_trained_count > 0 else "red"
+
+        # Color code temperature
+        temp_color = "red" if avg_temp > 80 else "bright_yellow" if avg_temp > 65 else "bright_green"
+
+        lines.append(f"[bright_cyan]│[/bright_cyan] [bright_white]DEVICES:[/bright_white] [{device_status_color}]{active_devices}/{total_devices} ACTIVE[/{device_status_color}]     [bright_cyan]│[/bright_cyan] [bright_white]DDR TRAINED:[/bright_white] [{ddr_status_color}]{ddr_trained_count}/{total_devices}[/{ddr_status_color}]   [bright_cyan]│[/bright_cyan] [bright_white]TOTAL PWR:[/bright_white] [bright_yellow]{total_power:5.1f}W[/bright_yellow]")
+        lines.append(f"[bright_cyan]│[/bright_cyan] [bright_white]ARC HEARTBEATS:[/bright_white] [bright_green]{arc_status}[/bright_green]     [bright_cyan]│[/bright_cyan] [bright_white]CHANNELS:[/bright_white] [bright_cyan]MONITORING[/bright_cyan] [bright_cyan]│[/bright_cyan] [bright_white]AVG TEMP:[/bright_white] [{temp_color}]{avg_temp:5.1f}°C[/{temp_color}]")
+        lines.append(f"[bright_cyan]│[/bright_cyan] [bright_white]TELEMETRY:[/bright_white] [bright_magenta]{self.animation_frame:06d}[/bright_magenta]      [bright_cyan]│[/bright_cyan] [bright_white]SPEED:[/bright_white] [bright_green]REALTIME[/bright_green]     [bright_cyan]│[/bright_cyan] [bright_white]AVG AICLK:[/bright_white] [bright_cyan]{avg_aiclk:4.0f}MHz[/bright_cyan]")
+        lines.append("[bright_cyan]└─────────────────────── └─────────────────── └──────────────────[/bright_cyan]")
 
         return lines
 
     def _create_bbs_heatmap_section(self) -> List[str]:
-        """Create BBS-style temporal heatmap - borderless right side"""
+        """Create BBS-style temporal heatmap with cyberpunk colors - borderless right side"""
         lines = []
-        lines.append("┌─────────── TEMPORAL ACTIVITY ANALYSIS")
-        lines.append("│ DEVICE     │ ACTIVITY HISTORY (LAST 60 SECONDS)       │ NOW")
-        lines.append("├────────────┼───────────────────────────────────────────┼─────")
+        lines.append("[bright_cyan]┌─────────── [bold bright_white]TEMPORAL ACTIVITY ANALYSIS[/bold bright_white][/bright_cyan]")
+        lines.append("[bright_cyan]│[/bright_cyan] [bright_white]DEVICE[/bright_white]     [bright_cyan]│[/bright_cyan] [bright_white]ACTIVITY HISTORY (LAST 60 SECONDS)[/bright_white]       [bright_cyan]│[/bright_cyan] [bright_white]NOW[/bright_white]")
+        lines.append("[bright_cyan]├────────────┼───────────────────────────────────────────┼─────[/bright_cyan]")
 
         chars = " ·∙▁▂▃▄▅▆▇█"
+        char_colors = ["dim white", "dim white", "dim white", "bright_cyan", "bright_cyan", "bright_green", "bright_yellow", "yellow", "red", "bold red", "bold red"]
 
         for i, device in enumerate(self.backend.devices):
             device_name = self.backend.get_device_name(device)[:10]
             telem = self.backend.device_telemetrys[i]
             power = float(telem.get('power', '0.0'))
 
-            # Generate heatmap
+            # Generate colorized heatmap
             heatmap = ""
             for t in range(39):  # 39 characters for timeline
                 base_activity = 30 + i * 15
                 variation = 10 * (1 + 0.5 * ((self.animation_frame + t + i * 5) % 20) / 10)
                 activity = max(0, base_activity + variation)
                 intensity = min(int(activity / 10), len(chars) - 1)
-                heatmap += chars[intensity]
+                char = chars[intensity]
+                color = char_colors[intensity]
+                heatmap += f"[{color}]{char}[/{color}]"
 
-            # Current power indicator
-            current_indicator = "████" if power > 50 else "███▓" if power > 25 else "██▓▓" if power > 10 else "▓▓▓▓"
+            # Current power indicator with colors
+            if power > 50:
+                current_indicator = "[bold red]████[/bold red]"
+            elif power > 25:
+                current_indicator = "[bold yellow]███[/bold yellow][dim white]▓[/dim white]"
+            elif power > 10:
+                current_indicator = "[bright_green]██[/bright_green][dim white]▓▓[/dim white]"
+            else:
+                current_indicator = "[dim white]▓▓▓▓[/dim white]"
 
-            line = f"│ {device_name:10} │ {heatmap} │ {current_indicator}"
+            line = f"[bright_cyan]│[/bright_cyan] [bold bright_white]{device_name:10}[/bold bright_white] [bright_cyan]│[/bright_cyan] {heatmap} [bright_cyan]│[/bright_cyan] {current_indicator}"
             lines.append(line)
 
-        lines.append("│            │ ↑60s    ↑30s    ↑10s    ↑5s     ↑NOW    │")
-        lines.append("└────────────┴───────────────────────────────────────────┴─────")
+        lines.append("[bright_cyan]│[/bright_cyan]            [bright_cyan]│[/bright_cyan] [dim bright_white]↑60s    ↑30s    ↑10s    ↑5s     ↑NOW[/dim bright_white]    [bright_cyan]│[/bright_cyan]")
+        lines.append("[bright_cyan]└────────────┴───────────────────────────────────────────┴─────[/bright_cyan]")
         return lines
 
     def _create_bbs_interconnect_section(self) -> List[str]:
-        """Create BBS-style interconnect matrix - borderless right side"""
+        """Create BBS-style interconnect matrix with cyberpunk colors - borderless right side"""
         lines = []
 
-        # Borderless matrix
-        lines.append("┌─────────────── INTERCONNECT BANDWIDTH MATRIX")
+        # Borderless matrix with colors
+        lines.append("[bright_cyan]┌─────────────── [bold bright_white]INTERCONNECT BANDWIDTH MATRIX[/bold bright_white][/bright_cyan]")
 
-        # Device labels header
+        # Device labels header with colors
         device_labels = [self.backend.get_device_name(d)[:8] for d in self.backend.devices]
-        header_content = "FROM\\TO  │ " + " │ ".join(f"{name:8s}" for name in device_labels)
-        lines.append(f"│ {header_content}")
+        header_content = "[bright_magenta]FROM\\TO[/bright_magenta]  [bright_cyan]│[/bright_cyan] " + " [bright_cyan]│[/bright_cyan] ".join(f"[bold bright_white]{name:8s}[/bold bright_white]" for name in device_labels)
+        lines.append(f"[bright_cyan]│[/bright_cyan] {header_content}")
 
         # Separator line
         separator_parts = ["─" * 8 for _ in device_labels]
         separator_content = "─" * 8 + "┼" + "┼".join(separator_parts)
-        lines.append(f"├─{separator_content}")
+        lines.append(f"[bright_cyan]├─{separator_content}[/bright_cyan]")
 
-        # Matrix rows
+        # Matrix rows with colored bandwidth indicators
         for i, device in enumerate(self.backend.devices):
             device_name = self.backend.get_device_name(device)[:8]
             utilizations = []
 
             for j in range(len(self.backend.devices)):
                 if i == j:
-                    utilizations.append("  SELF  ")
+                    utilizations.append("[dim bright_white]  SELF  [/dim bright_white]")
                 else:
                     # Calculate bandwidth simulation
                     telem_i = self.backend.device_telemetrys[i]
@@ -877,27 +912,27 @@ class TTTopDisplay(Static):
                     bandwidth = min(abs(current_i - current_j) * 2, 99)
 
                     if bandwidth > 50:
-                        utilizations.append(f"▓▓{bandwidth:3.0f}  ")
+                        utilizations.append(f"[bold red]▓▓[/bold red][bright_yellow]{bandwidth:3.0f}[/bright_yellow]  ")
                     elif bandwidth > 25:
-                        utilizations.append(f"▒▒{bandwidth:3.0f}  ")
+                        utilizations.append(f"[bold yellow]▒▒[/bold yellow][bright_white]{bandwidth:3.0f}[/bright_white]  ")
                     elif bandwidth > 10:
-                        utilizations.append(f"░░{bandwidth:3.0f}  ")
+                        utilizations.append(f"[bright_green]░░[/bright_green][bright_cyan]{bandwidth:3.0f}[/bright_cyan]  ")
                     else:
-                        utilizations.append(f"  {bandwidth:3.0f}  ")
+                        utilizations.append(f"  [dim white]{bandwidth:3.0f}[/dim white]  ")
 
-            # Build row (no right border)
-            row_content = f"{device_name:8s} │ " + " │ ".join(utilizations)
-            lines.append(f"│ {row_content}")
+            # Build row (no right border) with colors
+            row_content = f"[bold bright_white]{device_name:8s}[/bold bright_white] [bright_cyan]│[/bright_cyan] " + " [bright_cyan]│[/bright_cyan] ".join(utilizations)
+            lines.append(f"[bright_cyan]│[/bright_cyan] {row_content}")
 
         # Bottom border (no right side)
         bottom_parts = ["─" * 8 for _ in device_labels]
         bottom_content = "─" * 8 + "┴" + "┴".join(bottom_parts)
-        lines.append(f"└─{bottom_content}")
+        lines.append(f"[bright_cyan]└─{bottom_content}[/bright_cyan]")
 
-        # Legend (borderless)
-        lines.append("┌─ LEGEND")
-        lines.append("│ ▓▓ HIGH (>50) ▒▒ MED (25-50) ░░ LOW (10-25)  IDLE (<10)")
-        lines.append("└─────────────────────────────────────────────────────────")
+        # Legend with colors
+        lines.append("[bright_cyan]┌─ [bright_white]LEGEND[/bright_white][/bright_cyan]")
+        lines.append("[bright_cyan]│[/bright_cyan] [bold red]▓▓ HIGH (>50)[/bold red] [bold yellow]▒▒ MED (25-50)[/bold yellow] [bright_green]░░ LOW (10-25)[/bright_green]  [dim white]IDLE (<10)[/dim white]")
+        lines.append("[bright_cyan]└─────────────────────────────────────────────────────────[/bright_cyan]")
 
         return lines
 
