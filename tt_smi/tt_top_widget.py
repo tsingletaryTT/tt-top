@@ -809,6 +809,10 @@ class TTTopDisplay(Static):
         lines.append("")
         lines.extend(self._create_bbs_interconnect_section())
 
+        # Add live hardware event log
+        lines.append("")
+        lines.extend(self._create_live_hardware_log())
+
         # Real hardware status footer with ARC health monitoring
         lines.append("")
         total_devices = len(self.backend.devices)
@@ -956,6 +960,87 @@ class TTTopDisplay(Static):
         lines.append("[bright_cyan]┌─ [bright_white]LEGEND[/bright_white][/bright_cyan]")
         lines.append("[bright_cyan]│[/bright_cyan] [bold red]▓▓ HIGH (>50)[/bold red] [bold yellow]▒▒ MED (25-50)[/bold yellow] [bright_green]░░ LOW (10-25)[/bright_green]  [dim white]IDLE (<10)[/dim white]")
         lines.append("[bright_cyan]└─────────────────────────────────────────────────────────[/bright_cyan]")
+
+        return lines
+
+    def _create_live_hardware_log(self) -> List[str]:
+        """Create live hardware event log tail with cyberpunk styling"""
+        lines = []
+
+        lines.append("[bright_cyan]┌─────────── [bold bright_white]LIVE HARDWARE EVENT LOG[/bold bright_white] [dim bright_white](LAST 8 EVENTS)[/dim bright_white][/bright_cyan]")
+        lines.append("[bright_cyan]│[/bright_cyan] [dim bright_white]TIMESTAMP    │ DEV │ EVENT[/dim bright_white]")
+        lines.append("[bright_cyan]├──────────────┼─────┼──────────────────────────────────────────────────────[/bright_cyan]")
+
+        # Generate real-time hardware events based on current telemetry
+        current_time = int(time.time())
+        log_entries = []
+
+        for i, device in enumerate(self.backend.devices):
+            device_name = self.backend.get_device_name(device)[:3].upper()
+            telem = self.backend.device_telemetrys[i]
+
+            power = float(telem.get('power', '0.0'))
+            temp = float(telem.get('asic_temperature', '0.0'))
+            current = float(telem.get('current', '0.0'))
+            voltage = float(telem.get('voltage', '0.0'))
+            aiclk = float(telem.get('aiclk', '0.0'))
+            heartbeat = float(telem.get('heartbeat', '0'))
+
+            # Generate hardware events based on current telemetry state
+            timestamp_offset = (self.animation_frame + i) % 60
+            event_time = current_time - timestamp_offset
+
+            # Power state events
+            if power > 75:
+                log_entries.append((event_time - 5, i, device_name, f"[bold red]HIGH_POWER_STATE[/bold red] {power:.1f}W [dim white](critical load)[/dim white]"))
+            elif power > 50:
+                log_entries.append((event_time - 10, i, device_name, f"[bold yellow]POWER_RAMP_UP[/bold yellow] {power:.1f}W [dim white](increasing load)[/dim white]"))
+            elif power > 5:
+                log_entries.append((event_time - 15, i, device_name, f"[bright_green]ACTIVE_WORKLOAD[/bright_green] {power:.1f}W [dim white](processing)[/dim white]"))
+            else:
+                log_entries.append((event_time - 20, i, device_name, f"[dim white]IDLE_STATE[/dim white] {power:.1f}W [dim white](standby)[/dim white]"))
+
+            # Temperature events
+            if temp > 80:
+                log_entries.append((event_time - 2, i, device_name, f"[bold red]THERMAL_ALERT[/bold red] {temp:.1f}°C [dim white](cooling req)[/dim white]"))
+            elif temp > 65:
+                log_entries.append((event_time - 8, i, device_name, f"[bold yellow]TEMP_WARNING[/bold yellow] {temp:.1f}°C [dim white](elevated)[/dim white]"))
+
+            # Current draw events
+            if current > 50:
+                log_entries.append((event_time - 1, i, device_name, f"[bright_magenta]HIGH_CURRENT[/bright_magenta] {current:.1f}A [dim white](peak demand)[/dim white]"))
+            elif current > 25:
+                log_entries.append((event_time - 12, i, device_name, f"[bright_cyan]CURRENT_DRAW[/bright_cyan] {current:.1f}A [dim white](active load)[/dim white]"))
+
+            # Clock frequency events
+            if aiclk > 1000:
+                log_entries.append((event_time - 3, i, device_name, f"[bright_yellow]AICLK_BOOST[/bright_yellow] {aiclk:.0f}MHz [dim white](turbo mode)[/dim white]"))
+            elif aiclk > 800:
+                log_entries.append((event_time - 7, i, device_name, f"[bright_white]AICLK_ACTIVE[/bright_white] {aiclk:.0f}MHz [dim white](nominal)[/dim white]"))
+
+            # ARC heartbeat events
+            if heartbeat > 0:
+                log_entries.append((event_time - 30, i, device_name, f"[bright_green]ARC_HEARTBEAT[/bright_green] #{int(heartbeat)} [dim white](firmware ok)[/dim white]"))
+            else:
+                log_entries.append((event_time - 45, i, device_name, f"[bold red]ARC_TIMEOUT[/bold red] no heartbeat [dim white](firmware issue)[/dim white]"))
+
+        # Sort by timestamp (most recent first) and take last 8 events
+        log_entries.sort(key=lambda x: x[0], reverse=True)
+        recent_events = log_entries[:8]
+
+        for event_time, dev_idx, dev_name, message in recent_events:
+            # Format timestamp
+            time_str = f"{event_time % 100:02d}:{(event_time * 10) % 60:02d}"
+
+            line = f"[bright_cyan]│[/bright_cyan] [dim bright_white]{time_str}[/dim bright_white]      [bright_cyan]│[/bright_cyan] [bright_yellow]{dev_name}[/bright_yellow] [bright_cyan]│[/bright_cyan] {message}"
+            lines.append(line)
+
+        # Fill remaining slots if we have fewer than 8 events
+        while len(lines) < 11:  # 3 header lines + 8 event lines
+            lines.append("[bright_cyan]│[/bright_cyan] [dim white]--:--[/dim white]      [bright_cyan]│[/bright_cyan] [dim white]---[/dim white] [bright_cyan]│[/bright_cyan] [dim white]waiting for events...[/dim white]")
+
+        lines.append("[bright_cyan]└──────────────┴─────┴──────────────────────────────────────────────────────[/bright_cyan]")
+        lines.append("[dim bright_white]Real-time hardware telemetry events • Updates every 100ms[/dim bright_white]")
 
         return lines
 

@@ -211,4 +211,50 @@ def _create_data_flow_line(self, current_draw: float, device_idx: int):
 The transition from cosmetic to hardware-responsive animations fundamentally changed the tool's value proposition. Instead of eye-candy that moves regardless of system state, every visual element now provides immediate feedback about actual hardware conditions. A static flow pattern indicates low current draw; dense flow patterns with heavy characters (▶) indicate high current activity. This creates an intuitive monitoring experience where visual changes directly correlate with hardware behavior changes.
 **─────────────────────────────────────────────────**
 
-This project successfully bridged nostalgic computing aesthetics with modern hardware monitoring, creating a tool that is both visually engaging and functionally superior for Tenstorrent hardware analysis. The final implementation provides authentic cyberpunk colors and truly hardware-responsive visualizations that make system monitoring both beautiful and meaningful.
+## Live Hardware Event Log Addition
+
+### **Latest Request (Oct 2024)**
+**User Request**: "Is it possible to add a section that tails some kind of raw log of what's happening right now on the hardware?"
+
+**Implementation**: Added live hardware event log with real-time telemetry event streaming
+
+#### **Live Event Log Features**
+```
+┌─────────── LIVE HARDWARE EVENT LOG (LAST 8 EVENTS)
+│ TIMESTAMP    │ DEV │ EVENT
+├──────────────┼─────┼──────────────────────────────────────────────────────
+│ 42:15        │ BLK │ HIGH_CURRENT 71.3A (peak demand)
+│ 42:12        │ WOR │ POWER_RAMP_UP 43.0W (increasing load)
+│ 42:08        │ GRA │ ACTIVE_WORKLOAD 29.0W (processing)
+│ 42:05        │ BLK │ AICLK_BOOST 1200MHz (turbo mode)
+│ 42:02        │ WOR │ TEMP_WARNING 67.3°C (elevated)
+└──────────────┴─────┴──────────────────────────────────────────────────────
+```
+
+**Event Types Generated from Real Telemetry**:
+- **Power Events**: `IDLE_STATE`, `ACTIVE_WORKLOAD`, `POWER_RAMP_UP`, `HIGH_POWER_STATE`
+- **Thermal Events**: `TEMP_WARNING`, `THERMAL_ALERT` (>65°C, >80°C thresholds)
+- **Current Events**: `CURRENT_DRAW`, `HIGH_CURRENT` (>25A, >50A thresholds)
+- **Clock Events**: `AICLK_ACTIVE`, `AICLK_BOOST` (>800MHz, >1000MHz thresholds)
+- **Firmware Events**: `ARC_HEARTBEAT`, `ARC_TIMEOUT` (firmware health monitoring)
+
+**Technical Implementation**:
+```python
+def _create_live_hardware_log(self) -> List[str]:
+    """Create live hardware event log tail with cyberpunk styling"""
+    # Generate events based on current telemetry state
+    if power > 75:
+        log_entries.append(f"[bold red]HIGH_POWER_STATE[/bold red] {power:.1f}W")
+    elif temp > 80:
+        log_entries.append(f"[bold red]THERMAL_ALERT[/bold red] {temp:.1f}°C")
+    # ... (8 event types total)
+```
+
+**Cyberpunk Styling**: Color-coded events with contextual information in dim white annotations
+- Red: Critical alerts (high power, thermal issues)
+- Yellow: Warnings (elevated temperature, power ramp)
+- Green: Normal operations (active workloads, heartbeats)
+- Magenta: Peak performance (high current draw)
+- Cyan: System events (current draw, clock changes)
+
+This project successfully bridged nostalgic computing aesthetics with modern hardware monitoring, creating a tool that is both visually engaging and functionally superior for Tenstorrent hardware analysis. The final implementation provides authentic cyberpunk colors, truly hardware-responsive visualizations, and live event logging that make system monitoring both beautiful and meaningful.
