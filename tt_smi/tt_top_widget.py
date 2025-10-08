@@ -735,11 +735,13 @@ class TTTopDisplay(Static):
                 system_status = "READY"
 
         lines.append("    [bright_cyan]╔══════════════════════════════════════════════════════════════════════════════[/bright_cyan]")
-        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]████████ ████████ ███    █ ████████  ████████ ███████  ████████ ████████[/{logo_color}]")
-        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]   ██    ██       ████   █ ██           ██    ██    ██ ██    ██ ██      [/{logo_color}]")
-        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]   ██    ██████   ██ ██  █ ██████       ██    ██    ██ ████████ ████████[/{logo_color}]")
-        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]   ██    ██       ██  ██ █     ██       ██    ██    ██ ██ ██    ██    ██[/{logo_color}]")
-        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]   ██    ████████ ██   ███ ████████     ██    ███████  ██  ████ ████████[/{logo_color}]")
+        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]████████╗███████╗███╗   ██╗███████╗████████╗ ██████╗ ██████╗ ██████╗ ███████╗███╗   ██╗████████╗[/{logo_color}]")
+        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]╚══██╔══╝██╔════╝████╗  ██║██╔════╝╚══██╔══╝██╔═══██╗██╔══██╗██╔══██╗██╔════╝████╗  ██║╚══██╔══╝[/{logo_color}]")
+        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]   ██║   █████╗  ██╔██╗ ██║███████╗   ██║   ██║   ██║██████╔╝██████╔╝█████╗  ██╔██╗ ██║   ██║   [/{logo_color}]")
+        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]   ██║   ██╔══╝  ██║╚██╗██║╚════██║   ██║   ██║   ██║██╔══██╗██╔══██╗██╔══╝  ██║╚██╗██║   ██║   [/{logo_color}]")
+        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]   ██║   ███████╗██║ ╚████║███████║   ██║   ╚██████╔╝██║  ██║██║  ██║███████╗██║ ╚████║   ██║   [/{logo_color}]")
+        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]   ╚═╝   ╚══════╝╚═╝  ╚═══╝╚══════╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═══╝   ╚═╝   [/{logo_color}]")
+        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]                                   ╚═══ top ═══╝[/{logo_color}]")
         lines.append("    [bright_cyan]║[/bright_cyan]")
         lines.append(f"    [bright_cyan]║[/bright_cyan] [bright_white]tt-smi live monitor[/bright_white] [dim white]│[/dim white] [bright_white]Status:[/bright_white] [{logo_color}]{system_status}[/{logo_color}] [dim white]│[/dim white] [bright_white]Devices:[/bright_white] {total_devices}")
         lines.append("    [bright_cyan]╚══════════════════════════════════════════════════════════════════════════════[/bright_cyan]")
