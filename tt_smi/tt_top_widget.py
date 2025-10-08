@@ -702,19 +702,47 @@ class TTTopDisplay(Static):
         return "\n".join(lines)
 
     def _create_bbs_header(self) -> List[str]:
-        """Create BBS-style header with cyberpunk colors - borderless right side"""
+        """Create TENSTORRENT ASCII header with hardware-responsive colors"""
         lines = []
 
-        # Cyberpunk BBS-style header with tasteful colors
-        lines.append("    [bold bright_cyan]╔══════════════════════════════════════════════════════════════════════════════[/bold bright_cyan]")
-        lines.append("    [bold bright_cyan]║[/bold bright_cyan]  [bright_magenta]▄▄▄▄▄▄▄[/bright_magenta]   [bold bright_white]TT-SYSMON v3.0 - [/bold bright_white][bold yellow]NEURAL INTERFACE ONLINE[/bold yellow]   [bright_magenta]▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄[/bright_magenta]")
-        lines.append("    [bold bright_cyan]║[/bold bright_cyan] [bright_magenta]████▓▓▓██[/bright_magenta]                                           [bright_magenta]██████████████████▓▓[/bright_magenta]")
-        lines.append("    [bold bright_cyan]║[/bold bright_cyan] [bright_magenta]██▓[/bright_magenta][dim white]░░░[/dim white][bright_magenta]▓██[/bright_magenta]  [bright_cyan]┌─ TENSTORRENT MATRIX GRID ─┐[/bright_cyan]          [bright_magenta]████▓▓[/bright_magenta][dim white]░░[/dim white][bright_magenta]██[/bright_magenta][dim white]░░[/dim white][bright_magenta]▓▓████▓▓[/bright_magenta]")
-        lines.append("    [bold bright_cyan]║[/bold bright_cyan] [bright_magenta]██▓[/bright_magenta][dim white]░[/dim white][bright_green]█[/bright_green][dim white]░[/dim white][bright_magenta]▓██[/bright_magenta]  [bright_cyan]│[/bright_cyan] [bright_white]REAL-TIME TELEMETRY GRID[/bright_white]  [bright_cyan]│[/bright_cyan]          [bright_magenta]████▓▓[/bright_magenta][dim white]░░[/dim white][bright_magenta]██[/bright_magenta][dim white]░░[/dim white][bright_magenta]▓▓████▓▓[/bright_magenta]")
-        lines.append("    [bold bright_cyan]║[/bold bright_cyan] [bright_magenta]██▓[/bright_magenta][dim white]░░░[/dim white][bright_magenta]▓██[/bright_magenta]  [bright_cyan]│[/bright_cyan] [bright_white]INTERCONNECT FLOW MATRIX[/bright_white]  [bright_cyan]│[/bright_cyan]          [bright_magenta]████▓▓[/bright_magenta][dim white]░░[/dim white][bright_magenta]██[/bright_magenta][dim white]░░[/dim white][bright_magenta]▓▓████▓▓[/bright_magenta]")
-        lines.append("    [bold bright_cyan]║[/bold bright_cyan] [bright_magenta]████▓▓▓██[/bright_magenta]  [bright_cyan]│[/bright_cyan] [bright_white]MEMORY TOPOLOGY SCANNER[/bright_white]   [bright_cyan]│[/bright_cyan]          [bright_magenta]██████████████████▓▓[/bright_magenta]")
-        lines.append("    [bold bright_cyan]║[/bold bright_cyan]  [bright_magenta]▀▀▀▀▀▀▀[/bright_magenta]   [bright_cyan]└───────────────────────────┘[/bright_cyan]           [bright_magenta]▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀[/bright_magenta]")
-        lines.append("    [bold bright_cyan]╚══════════════════════════════════════════════════════════════════════════════[/bold bright_cyan]")
+        # Calculate system health for color responsiveness
+        total_devices = len(self.backend.devices)
+        if total_devices == 0:
+            logo_color = "dim white"
+            system_status = "NO DEVICES"
+        else:
+            # Get average temperature and power across all devices
+            avg_temp = sum(float(self.backend.device_telemetrys[i].get('asic_temperature', '0'))
+                          for i in range(total_devices)) / total_devices
+            total_power = sum(float(self.backend.device_telemetrys[i].get('power', '0'))
+                             for i in range(total_devices))
+
+            # Logo color responds to system thermal state
+            if avg_temp > 80:
+                logo_color = "bold red"
+                system_status = "THERMAL WARNING"
+            elif avg_temp > 65:
+                logo_color = "bold yellow"
+                system_status = "ELEVATED TEMP"
+            elif total_power > 200:
+                logo_color = "bright_yellow"
+                system_status = "HIGH POWER"
+            elif total_power > 50:
+                logo_color = "bright_green"
+                system_status = "ACTIVE"
+            else:
+                logo_color = "bright_cyan"
+                system_status = "READY"
+
+        lines.append("    [bright_cyan]╔══════════════════════════════════════════════════════════════════════════════[/bright_cyan]")
+        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]████████ ████████ ███    █ ████████  ████████ ███████  ████████ ████████[/{logo_color}]")
+        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]   ██    ██       ████   █ ██           ██    ██    ██ ██    ██ ██      [/{logo_color}]")
+        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]   ██    ██████   ██ ██  █ ██████       ██    ██    ██ ████████ ████████[/{logo_color}]")
+        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]   ██    ██       ██  ██ █     ██       ██    ██    ██ ██ ██    ██    ██[/{logo_color}]")
+        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]   ██    ████████ ██   ███ ████████     ██    ███████  ██  ████ ████████[/{logo_color}]")
+        lines.append("    [bright_cyan]║[/bright_cyan]")
+        lines.append(f"    [bright_cyan]║[/bright_cyan] [bright_white]tt-smi live monitor[/bright_white] [dim white]│[/dim white] [bright_white]Status:[/bright_white] [{logo_color}]{system_status}[/{logo_color}] [dim white]│[/dim white] [bright_white]Devices:[/bright_white] {total_devices}")
+        lines.append("    [bright_cyan]╚══════════════════════════════════════════════════════════════════════════════[/bright_cyan]")
 
         return lines
 
@@ -837,7 +865,7 @@ class TTTopDisplay(Static):
         avg_aiclk = sum(float(self.backend.device_telemetrys[i].get('aiclk', '0'))
                        for i in range(total_devices)) / max(total_devices, 1)
 
-        lines.append("[bright_cyan]┌─ [bold bright_white]HARDWARE STATUS[/bold bright_white] ────── [bright_cyan]┌─ [bold bright_white]MEMORY STATUS[/bold bright_white] ──── [bright_cyan]┌─ [bold bright_white]REAL-TIME METRICS[/bold bright_white][/bright_cyan]")
+        lines.append("[bright_cyan]┌─ [bold bright_white]HARDWARE STATUS[/bold bright_white] ────── [bright_cyan]┌─ [bold bright_white]MEMORY STATUS[/bold bright_white] ──── [bright_cyan]┌─ [bold bright_white]SYSTEM METRICS[/bold bright_white][/bright_cyan]")
 
         # Color code device status
         device_status_color = "bright_green" if active_devices == total_devices else "bright_yellow" if active_devices > 0 else "red"
@@ -847,8 +875,8 @@ class TTTopDisplay(Static):
         temp_color = "red" if avg_temp > 80 else "bright_yellow" if avg_temp > 65 else "bright_green"
 
         lines.append(f"[bright_cyan]│[/bright_cyan] [bright_white]DEVICES:[/bright_white] [{device_status_color}]{active_devices}/{total_devices} ACTIVE[/{device_status_color}]     [bright_cyan]│[/bright_cyan] [bright_white]DDR TRAINED:[/bright_white] [{ddr_status_color}]{ddr_trained_count}/{total_devices}[/{ddr_status_color}]   [bright_cyan]│[/bright_cyan] [bright_white]TOTAL PWR:[/bright_white] [bright_yellow]{total_power:5.1f}W[/bright_yellow]")
-        lines.append(f"[bright_cyan]│[/bright_cyan] [bright_white]ARC HEARTBEATS:[/bright_white] [bright_green]{arc_status}[/bright_green]     [bright_cyan]│[/bright_cyan] [bright_white]CHANNELS:[/bright_white] [bright_cyan]MONITORING[/bright_cyan] [bright_cyan]│[/bright_cyan] [bright_white]AVG TEMP:[/bright_white] [{temp_color}]{avg_temp:5.1f}°C[/{temp_color}]")
-        lines.append(f"[bright_cyan]│[/bright_cyan] [bright_white]TELEMETRY:[/bright_white] [bright_magenta]{self.animation_frame:06d}[/bright_magenta]      [bright_cyan]│[/bright_cyan] [bright_white]SPEED:[/bright_white] [bright_green]REALTIME[/bright_green]     [bright_cyan]│[/bright_cyan] [bright_white]AVG AICLK:[/bright_white] [bright_cyan]{avg_aiclk:4.0f}MHz[/bright_cyan]")
+        lines.append(f"[bright_cyan]│[/bright_cyan] [bright_white]ARC HEARTBEATS:[/bright_white] [bright_green]{arc_status}[/bright_green]     [bright_cyan]│[/bright_cyan] [bright_white]CHANNELS:[/bright_white] [bright_cyan]ACTIVE[/bright_cyan]     [bright_cyan]│[/bright_cyan] [bright_white]AVG TEMP:[/bright_white] [{temp_color}]{avg_temp:5.1f}°C[/{temp_color}]")
+        lines.append(f"[bright_cyan]│[/bright_cyan] [bright_white]FRAMES:[/bright_white] [bright_magenta]{self.animation_frame:06d}[/bright_magenta]        [bright_cyan]│[/bright_cyan] [bright_white]REFRESH:[/bright_white] [bright_green]100ms[/bright_green]       [bright_cyan]│[/bright_cyan] [bright_white]AVG AICLK:[/bright_white] [bright_cyan]{avg_aiclk:4.0f}MHz[/bright_cyan]")
         lines.append("[bright_cyan]└─────────────────────── └─────────────────── └──────────────────[/bright_cyan]")
 
         return lines
@@ -967,7 +995,7 @@ class TTTopDisplay(Static):
         """Create live hardware event log tail with cyberpunk styling"""
         lines = []
 
-        lines.append("[bright_cyan]┌─────────── [bold bright_white]LIVE HARDWARE EVENT LOG[/bold bright_white] [dim bright_white](LAST 8 EVENTS)[/dim bright_white][/bright_cyan]")
+        lines.append("[bright_cyan]┌─────────── [bold bright_white]HARDWARE EVENT LOG[/bold bright_white] [dim bright_white](LAST 8 EVENTS)[/dim bright_white][/bright_cyan]")
         lines.append("[bright_cyan]│[/bright_cyan] [dim bright_white]TIMESTAMP    │ DEV │ EVENT[/dim bright_white]")
         lines.append("[bright_cyan]├──────────────┼─────┼──────────────────────────────────────────────────────[/bright_cyan]")
 
@@ -1040,7 +1068,7 @@ class TTTopDisplay(Static):
             lines.append("[bright_cyan]│[/bright_cyan] [dim white]--:--[/dim white]      [bright_cyan]│[/bright_cyan] [dim white]---[/dim white] [bright_cyan]│[/bright_cyan] [dim white]waiting for events...[/dim white]")
 
         lines.append("[bright_cyan]└──────────────┴─────┴──────────────────────────────────────────────────────[/bright_cyan]")
-        lines.append("[dim bright_white]Real-time hardware telemetry events • Updates every 100ms[/dim bright_white]")
+        lines.append("[dim bright_white]Hardware telemetry events • 100ms refresh[/dim bright_white]")
 
         return lines
 
