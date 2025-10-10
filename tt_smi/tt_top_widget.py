@@ -532,20 +532,131 @@ class TTTopDisplay(Static):
     def _detect_ml_workloads(self) -> List[dict]:
         """Detect machine learning workloads from system processes
 
-        Scans the Linux /proc filesystem to identify running processes
-        that match ML framework patterns, analyzes their resource usage,
-        and correlates activity with hardware telemetry patterns.
+        Uses multiple detection methods with fallbacks:
+        1. psutil library (preferred - cross-platform, robust)
+        2. subprocess ps command (Linux/Unix fallback)
+        3. /proc filesystem (last resort Linux fallback)
 
         Returns list of detected workload dictionaries with framework,
         model type, resource usage, and confidence scores.
         """
         detected_workloads = []
 
+        # Method 1: Try psutil first (most robust)
         try:
-            import os
-            import glob
-            import re
+            import psutil
+            detected_workloads = self._detect_ml_workloads_psutil()
+            if detected_workloads:
+                return detected_workloads
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
+        # Method 2: Try subprocess ps command (Unix/Linux systems)
+        try:
+            detected_workloads = self._detect_ml_workloads_ps()
+            if detected_workloads:
+                return detected_workloads
+        except Exception:
+            pass
+
+        # Method 3: Fallback to /proc filesystem (Linux only, last resort)
+        try:
+            detected_workloads = self._detect_ml_workloads_proc()
+        except Exception:
+            pass
+
+        return detected_workloads
+
+    def _detect_ml_workloads_psutil(self) -> List[dict]:
+        """Detect ML workloads using psutil library (preferred method)"""
+        import psutil
+        import re
+
+        detected_workloads = []
+
+        try:
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'memory_info', 'num_threads']):
+                try:
+                    proc_info = proc.info
+                    if not proc_info['cmdline']:
+                        continue
+
+                    # Join command line arguments
+                    cmdline = ' '.join(proc_info['cmdline'])
+                    pid = proc_info['pid']
+
+                    # Analyze for ML patterns
+                    workload_info = self._analyze_cmdline_for_ml_patterns(
+                        pid, cmdline, proc_info.get('memory_info'), proc_info.get('num_threads', 1)
+                    )
+
+                    if workload_info and workload_info['confidence'] > 0.3:
+                        detected_workloads.append(workload_info)
+
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    continue
+
+        except Exception:
+            return []
+
+        detected_workloads.sort(key=lambda w: (w.get('correlation_score', 0), w['confidence']), reverse=True)
+        return detected_workloads
+
+    def _detect_ml_workloads_ps(self) -> List[dict]:
+        """Detect ML workloads using ps subprocess command (Unix/Linux fallback)"""
+        import subprocess
+        import re
+
+        detected_workloads = []
+
+        try:
+            # Use ps to get process information
+            result = subprocess.run([
+                'ps', 'axo', 'pid,command', '--no-headers'
+            ], capture_output=True, text=True, timeout=5)
+
+            if result.returncode != 0:
+                return []
+
+            for line in result.stdout.strip().split('\n'):
+                if not line.strip():
+                    continue
+
+                # Parse ps output: PID followed by command
+                parts = line.strip().split(None, 1)
+                if len(parts) < 2:
+                    continue
+
+                try:
+                    pid = int(parts[0])
+                    cmdline = parts[1]
+
+                    # Analyze for ML patterns
+                    workload_info = self._analyze_cmdline_for_ml_patterns(pid, cmdline, None, 1)
+
+                    if workload_info and workload_info['confidence'] > 0.3:
+                        detected_workloads.append(workload_info)
+
+                except ValueError:
+                    continue
+
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
+            return []
+
+        detected_workloads.sort(key=lambda w: (w.get('correlation_score', 0), w['confidence']), reverse=True)
+        return detected_workloads
+
+    def _detect_ml_workloads_proc(self) -> List[dict]:
+        """Detect ML workloads using /proc filesystem (Linux last resort)"""
+        import os
+        import glob
+        import re
+
+        detected_workloads = []
+
+        try:
             # Scan all process directories in /proc
             for proc_dir in glob.glob('/proc/[0-9]*'):
                 try:
@@ -568,14 +679,139 @@ class TTTopDisplay(Static):
                     # Skip processes we can't access or that disappeared
                     continue
 
-        except ImportError:
-            # Fallback for systems without required modules
-            pass
+        except Exception:
+            return []
 
         # Sort by confidence score and correlation strength
         detected_workloads.sort(key=lambda w: (w.get('correlation_score', 0), w['confidence']), reverse=True)
-
         return detected_workloads
+
+    def _analyze_cmdline_for_ml_patterns(self, pid: int, cmdline: str, memory_info=None, num_threads: int = 1) -> dict:
+        """Analyze command line for ML framework patterns (used by psutil and ps methods)"""
+        import re
+
+        # Framework detection patterns
+        framework_patterns = {
+            'pytorch': [
+                r'python.*torch', r'torchrun', r'python.*transformers',
+                r'python.*accelerate', r'python.*deepspeed', r'python.*lightning'
+            ],
+            'tensorflow': [
+                r'python.*tensorflow', r'python.*tf\.', r'tf_cnn_benchmarks',
+                r'python.*keras'
+            ],
+            'jax': [
+                r'python.*jax', r'python.*flax', r'python.*optax',
+                r'python.*haiku', r'python.*dm-haiku'
+            ],
+            'huggingface': [
+                r'python.*transformers', r'python.*datasets', r'python.*accelerate',
+                r'accelerate.*launch', r'python.*peft'
+            ]
+        }
+
+        # Model type patterns
+        model_patterns = {
+            'llm': [
+                r'gpt', r'bert', r'roberta', r'llama', r'mistral', r'falcon',
+                r'bloom', r't5', r'bart', r'opt', r'palm', r'claude'
+            ],
+            'computer_vision': [
+                r'resnet', r'vgg', r'inception', r'mobilenet', r'efficientnet',
+                r'yolo', r'rcnn', r'ssd', r'unet', r'segformer'
+            ],
+            'audio_speech': [
+                r'whisper', r'wav2vec', r'hubert', r'speechbrain', r'espnet'
+            ]
+        }
+
+        # Workload type patterns
+        workload_patterns = {
+            'training': [r'train', r'training', r'fit', r'finetune', r'fine-tune'],
+            'inference': [r'inference', r'infer', r'predict', r'generate', r'serve'],
+            'evaluation': [r'eval', r'evaluate', r'test', r'benchmark']
+        }
+
+        cmdline_lower = cmdline.lower()
+
+        # Detect framework
+        detected_framework = 'unknown'
+        framework_confidence = 0.0
+
+        for framework, patterns in framework_patterns.items():
+            for pattern in patterns:
+                if re.search(pattern, cmdline_lower):
+                    detected_framework = framework
+                    framework_confidence = 0.8
+                    break
+            if framework_confidence > 0:
+                break
+
+        # Detect model type
+        detected_model_type = 'unknown'
+        model_confidence = 0.0
+
+        for model_type, patterns in model_patterns.items():
+            for pattern in patterns:
+                if re.search(pattern, cmdline_lower):
+                    detected_model_type = model_type
+                    model_confidence = 0.7
+                    break
+            if model_confidence > 0:
+                break
+
+        # Detect workload type
+        detected_workload_type = 'unknown'
+        workload_confidence = 0.0
+
+        for workload_type, patterns in workload_patterns.items():
+            for pattern in patterns:
+                if re.search(pattern, cmdline_lower):
+                    detected_workload_type = workload_type
+                    workload_confidence = 0.6
+                    break
+            if workload_confidence > 0:
+                break
+
+        # Calculate overall confidence
+        overall_confidence = max(framework_confidence, model_confidence, workload_confidence)
+
+        if overall_confidence > 0.3:
+            # Estimate memory usage
+            memory_gb = 0
+            if memory_info:
+                try:
+                    # psutil memory_info has rss attribute
+                    if hasattr(memory_info, 'rss'):
+                        memory_gb = memory_info.rss / (1024 * 1024 * 1024)  # Convert to GB
+                    else:
+                        memory_gb = memory_info / (1024 * 1024 * 1024)  # Convert to GB
+                except:
+                    memory_gb = 0
+
+            # Correlate with hardware telemetry
+            resource_info = {
+                'memory_gb': memory_gb,
+                'threads': num_threads,
+                'cpu_percent': 50 if memory_gb > 4 else 20  # Rough estimate
+            }
+
+            correlation_score = self._correlate_process_with_telemetry(pid, resource_info)
+
+            return {
+                'pid': pid,
+                'cmdline': cmdline[:80] + '...' if len(cmdline) > 80 else cmdline,
+                'framework': detected_framework,
+                'model_type': detected_model_type,
+                'workload_type': detected_workload_type,
+                'confidence': overall_confidence,
+                'correlation_score': correlation_score,
+                'memory_gb': resource_info.get('memory_gb', 0),
+                'thread_count': resource_info.get('threads', 1),
+                'cpu_percent': resource_info.get('cpu_percent', 0)
+            }
+
+        return None
 
     def _analyze_process_for_ml_patterns(self, pid: int, cmdline: str, proc_dir: str) -> dict:
         """Analyze individual process for ML framework patterns
@@ -1626,7 +1862,7 @@ class TTTopDisplay(Static):
                     colored_memory += "[dim white]◯[/dim white]"
 
             # Create BBS-style device entry with colors
-            device_line = f"[bright_cyan]│[/bright_cyan] [bright_white][[/bright_white][orange1]{i}[/orange1][bright_white]][/bright_white] [bold bright_white]{device_name:10s}[/bold bright_white] {status_icon} [bright_cyan]│[/bright_cyan]{status_block}[bright_cyan]│[/bright_cyan] [bright_white]{temp_display}[/bright_white] {temp_status}"
+            device_line = f"[bright_cyan]│[/bright_cyan] [bright_white]\\[[/bright_white][orange1]{i}[/orange1][bright_white]\\][/bright_white] [bold bright_white]{device_name:10s}[/bold bright_white] {status_icon} [bright_cyan]│[/bright_cyan]{status_block}[bright_cyan]│[/bright_cyan] [bright_white]{temp_display}[/bright_white] {temp_status}"
             lines.append(device_line)
 
             # Technical readout line with subtle colors
