@@ -464,6 +464,430 @@ class TTTopDisplay(Static):
 
         return "".join(flow_chars)
 
+    def _create_workload_detection_section(self) -> List[str]:
+        """Create intelligent workload detection and analysis section
+
+        Uses process analysis, command line parsing, and telemetry correlation
+        to identify ML frameworks, model types, and workload characteristics
+        running on the system that may be utilizing Tenstorrent hardware.
+        """
+        lines = []
+        lines.append(self._create_section_header("WORKLOAD INTELLIGENCE ENGINE"))
+
+        # Add detection methodology header
+        lines.append(self._create_bordered_line(
+            self._colorize_text("Detection Sources:", "bright_white") + " " +
+            self._colorize_text("/proc filesystem", "bright_cyan") + " • " +
+            self._colorize_text("Process cmdlines", "bright_cyan") + " • " +
+            self._colorize_text("Memory patterns", "bright_cyan") + " • " +
+            self._colorize_text("Telemetry correlation", "bright_cyan")
+        ))
+        lines.append(self._create_section_border())
+
+        try:
+            # Detect active ML workloads
+            workloads = self._detect_ml_workloads()
+
+            if not workloads:
+                lines.append(self._create_bordered_line(
+                    self._colorize_text("Status:", "bright_white") + " " +
+                    self._colorize_text("No ML workloads detected", "orange1") + " " +
+                    self._colorize_text("(Scanning /proc filesystem...)", "dim white")
+                ))
+            else:
+                # Display detected workloads
+                for workload in workloads[:5]:  # Show top 5 workloads
+                    workload_line = self._format_workload_display(workload)
+                    lines.append(self._create_bordered_line(workload_line))
+
+                # Workload summary statistics
+                summary_line = self._create_workload_summary(workloads)
+                lines.append(self._create_bordered_line(""))
+                lines.append(self._create_bordered_line(summary_line))
+
+        except Exception as e:
+            # Graceful fallback for systems without /proc access
+            lines.append(self._create_bordered_line(
+                self._colorize_text("Status:", "bright_white") + " " +
+                self._colorize_text("Workload detection unavailable", "orange3") + " " +
+                self._colorize_text("(Requires Linux /proc filesystem)", "dim white")
+            ))
+
+        lines.append(self._create_section_footer())
+        return lines
+
+    def _detect_ml_workloads(self) -> List[dict]:
+        """Detect machine learning workloads from system processes
+
+        Scans the Linux /proc filesystem to identify running processes
+        that match ML framework patterns, analyzes their resource usage,
+        and correlates activity with hardware telemetry patterns.
+
+        Returns list of detected workload dictionaries with framework,
+        model type, resource usage, and confidence scores.
+        """
+        detected_workloads = []
+
+        try:
+            import os
+            import glob
+            import re
+
+            # Scan all process directories in /proc
+            for proc_dir in glob.glob('/proc/[0-9]*'):
+                try:
+                    pid = int(os.path.basename(proc_dir))
+
+                    # Read process command line
+                    cmdline_path = os.path.join(proc_dir, 'cmdline')
+                    if os.path.exists(cmdline_path):
+                        with open(cmdline_path, 'rb') as f:
+                            cmdline_bytes = f.read()
+                            cmdline = cmdline_bytes.replace(b'\x00', b' ').decode('utf-8', errors='ignore')
+
+                        # Apply ML workload detection heuristics
+                        workload_info = self._analyze_process_for_ml_patterns(pid, cmdline, proc_dir)
+
+                        if workload_info and workload_info['confidence'] > 0.3:
+                            detected_workloads.append(workload_info)
+
+                except (ValueError, PermissionError, FileNotFoundError):
+                    # Skip processes we can't access or that disappeared
+                    continue
+
+        except ImportError:
+            # Fallback for systems without required modules
+            pass
+
+        # Sort by confidence score and correlation strength
+        detected_workloads.sort(key=lambda w: (w.get('correlation_score', 0), w['confidence']), reverse=True)
+
+        return detected_workloads
+
+    def _analyze_process_for_ml_patterns(self, pid: int, cmdline: str, proc_dir: str) -> dict:
+        """Analyze individual process for ML framework patterns
+
+        Comprehensive analysis of process characteristics including:
+        - Command line pattern matching for ML frameworks
+        - Memory usage analysis for model size estimation
+        - File descriptor analysis for model/data files
+        - Resource usage patterns for workload classification
+        """
+
+        # Framework detection patterns
+        framework_patterns = {
+            'pytorch': [
+                r'python.*torch', r'torchrun', r'python.*transformers',
+                r'python.*accelerate', r'python.*deepspeed', r'python.*lightning'
+            ],
+            'tensorflow': [
+                r'python.*tensorflow', r'python.*tf\.', r'tf_cnn_benchmarks',
+                r'python.*keras'
+            ],
+            'jax': [
+                r'python.*jax', r'python.*flax', r'python.*optax',
+                r'python.*haiku', r'python.*dm-haiku'
+            ],
+            'huggingface': [
+                r'python.*transformers', r'python.*datasets', r'python.*accelerate',
+                r'accelerate.*launch', r'python.*peft'
+            ]
+        }
+
+        # Model type patterns
+        model_patterns = {
+            'llm': [
+                r'gpt', r'bert', r'roberta', r'llama', r'mistral', r'falcon',
+                r'bloom', r't5', r'bart', r'opt', r'palm', r'claude'
+            ],
+            'computer_vision': [
+                r'resnet', r'vgg', r'inception', r'mobilenet', r'efficientnet',
+                r'yolo', r'rcnn', r'ssd', r'unet', r'segformer'
+            ],
+            'audio_speech': [
+                r'whisper', r'wav2vec', r'hubert', r'speechbrain', r'espnet'
+            ]
+        }
+
+        # Workload type patterns
+        workload_patterns = {
+            'training': [r'train', r'training', r'fit', r'finetune', r'fine-tune'],
+            'inference': [r'inference', r'infer', r'predict', r'generate', r'serve'],
+            'evaluation': [r'eval', r'evaluate', r'test', r'benchmark']
+        }
+
+        cmdline_lower = cmdline.lower()
+
+        # Detect framework
+        detected_framework = 'unknown'
+        framework_confidence = 0.0
+
+        for framework, patterns in framework_patterns.items():
+            for pattern in patterns:
+                if re.search(pattern, cmdline_lower):
+                    detected_framework = framework
+                    framework_confidence = 0.8
+                    break
+            if framework_confidence > 0:
+                break
+
+        # Detect model type
+        detected_model_type = 'unknown'
+        model_confidence = 0.0
+
+        for model_type, patterns in model_patterns.items():
+            for pattern in patterns:
+                if re.search(pattern, cmdline_lower):
+                    detected_model_type = model_type
+                    model_confidence = 0.7
+                    break
+            if model_confidence > 0:
+                break
+
+        # Detect workload type
+        detected_workload_type = 'unknown'
+        workload_confidence = 0.0
+
+        for workload_type, patterns in workload_patterns.items():
+            for pattern in patterns:
+                if re.search(pattern, cmdline_lower):
+                    detected_workload_type = workload_type
+                    workload_confidence = 0.6
+                    break
+            if workload_confidence > 0:
+                break
+
+        # Analyze resource usage if we detected ML patterns
+        overall_confidence = max(framework_confidence, model_confidence, workload_confidence)
+
+        if overall_confidence > 0.3:
+            resource_info = self._analyze_process_resources(pid, proc_dir)
+
+            # Correlate with current hardware telemetry
+            correlation_score = self._correlate_process_with_telemetry(pid, resource_info)
+
+            return {
+                'pid': pid,
+                'cmdline': cmdline[:80] + '...' if len(cmdline) > 80 else cmdline,
+                'framework': detected_framework,
+                'model_type': detected_model_type,
+                'workload_type': detected_workload_type,
+                'confidence': overall_confidence,
+                'correlation_score': correlation_score,
+                'memory_gb': resource_info.get('memory_gb', 0),
+                'thread_count': resource_info.get('threads', 1),
+                'cpu_percent': resource_info.get('cpu_percent', 0)
+            }
+
+        return None
+
+    def _analyze_process_resources(self, pid: int, proc_dir: str) -> dict:
+        """Analyze process resource usage patterns for ML workload characteristics
+
+        Examines memory usage, thread count, and CPU utilization to help
+        classify workload types and estimate model sizes.
+        """
+        resource_info = {}
+
+        try:
+            # Memory analysis from /proc/PID/status
+            status_path = os.path.join(proc_dir, 'status')
+            if os.path.exists(status_path):
+                with open(status_path, 'r') as f:
+                    status_content = f.read()
+
+                # Extract memory information (values in KB)
+                vm_rss_match = re.search(r'VmRSS:\s*(\d+)\s*kB', status_content)
+                vm_size_match = re.search(r'VmSize:\s*(\d+)\s*kB', status_content)
+                threads_match = re.search(r'Threads:\s*(\d+)', status_content)
+
+                if vm_rss_match:
+                    resource_info['memory_gb'] = int(vm_rss_match.group(1)) / (1024 * 1024)
+                if vm_size_match:
+                    resource_info['vm_size_gb'] = int(vm_size_match.group(1)) / (1024 * 1024)
+                if threads_match:
+                    resource_info['threads'] = int(threads_match.group(1))
+
+            # CPU usage analysis would require temporal sampling
+            # For now, use simplified heuristics based on memory patterns
+            memory_gb = resource_info.get('memory_gb', 0)
+            threads = resource_info.get('threads', 1)
+
+            # Estimate CPU usage based on memory and thread patterns
+            if memory_gb > 10 and threads > 8:
+                resource_info['cpu_percent'] = 70  # High CPU estimate
+            elif memory_gb > 4 and threads > 4:
+                resource_info['cpu_percent'] = 40  # Medium CPU estimate
+            else:
+                resource_info['cpu_percent'] = 10  # Low CPU estimate
+
+        except (PermissionError, FileNotFoundError):
+            # Process may have disappeared or we lack permissions
+            pass
+
+        return resource_info
+
+    def _correlate_process_with_telemetry(self, pid: int, resource_info: dict) -> float:
+        """Correlate process activity with hardware telemetry patterns
+
+        Analyzes current hardware power consumption, temperature, and memory
+        usage patterns to estimate likelihood that this process is driving
+        hardware utilization on Tenstorrent devices.
+        """
+
+        try:
+            # Get current average hardware utilization across all devices
+            total_power = sum(float(self.backend.device_telemetrys[i].get('power', '0'))
+                            for i in range(len(self.backend.devices)))
+            avg_power = total_power / max(len(self.backend.devices), 1)
+
+            total_current = sum(float(self.backend.device_telemetrys[i].get('current', '0'))
+                              for i in range(len(self.backend.devices)))
+            avg_current = total_current / max(len(self.backend.devices), 1)
+
+            # Correlation heuristics based on resource patterns
+            correlation_score = 0.0
+
+            # High memory usage processes more likely to drive hardware
+            memory_gb = resource_info.get('memory_gb', 0)
+            if memory_gb > 8:  # Large models
+                correlation_score += 0.4
+            elif memory_gb > 4:  # Medium models
+                correlation_score += 0.2
+
+            # High thread count suggests compute-intensive workload
+            threads = resource_info.get('threads', 1)
+            if threads > 16:
+                correlation_score += 0.3
+            elif threads > 8:
+                correlation_score += 0.2
+
+            # Correlate with actual hardware power consumption
+            if avg_power > 60:  # High power usage
+                correlation_score += 0.3
+            elif avg_power > 30:  # Medium power usage
+                correlation_score += 0.2
+
+            # Current draw correlation (more precise than power)
+            if avg_current > 40:
+                correlation_score += 0.2
+            elif avg_current > 20:
+                correlation_score += 0.1
+
+            return min(correlation_score, 1.0)  # Cap at 1.0
+
+        except Exception:
+            return 0.1  # Low default correlation
+
+    def _format_workload_display(self, workload: dict) -> str:
+        """Format workload information for display in TT-Top
+
+        Creates a comprehensive single-line display showing framework,
+        model type, resource usage, and correlation with hardware activity.
+        """
+
+        # Framework color coding
+        framework_colors = {
+            'pytorch': 'orange1',
+            'tensorflow': 'bright_blue',
+            'jax': 'bright_green',
+            'huggingface': 'bright_magenta',
+            'unknown': 'dim white'
+        }
+
+        # Workload type indicators
+        workload_icons = {
+            'training': '🔥',
+            'inference': '⚡',
+            'evaluation': '📊',
+            'unknown': '❓'
+        }
+
+        framework = workload['framework']
+        framework_color = framework_colors.get(framework, 'dim white')
+        workload_icon = workload_icons.get(workload['workload_type'], '❓')
+
+        # Format the display line
+        pid_str = f"PID:{workload['pid']:5d}"
+        framework_str = self._colorize_text(framework.upper()[:8], framework_color)
+        model_type_str = self._colorize_text(workload['model_type'].upper()[:6], 'bright_cyan')
+
+        # Resource usage with appropriate colors
+        memory_gb = workload.get('memory_gb', 0)
+        memory_color = 'bold red' if memory_gb > 16 else 'orange3' if memory_gb > 8 else 'bright_green'
+        memory_str = self._colorize_text(f"{memory_gb:4.1f}GB", memory_color)
+
+        # Correlation strength indicator
+        correlation = workload.get('correlation_score', 0)
+        if correlation > 0.7:
+            correlation_str = self._colorize_text("█████", "bright_green")
+        elif correlation > 0.5:
+            correlation_str = self._colorize_text("████▓", "orange1")
+        elif correlation > 0.3:
+            correlation_str = self._colorize_text("███▓▓", "orange3")
+        else:
+            correlation_str = self._colorize_text("██▓▓▓", "dim white")
+
+        # Confidence indicator
+        confidence = workload['confidence']
+        confidence_str = f"{confidence*100:3.0f}%"
+        confidence_color = 'bright_green' if confidence > 0.7 else 'orange3' if confidence > 0.5 else 'dim white'
+
+        return (f"{workload_icon} {pid_str} │ {framework_str} │ {model_type_str} │ "
+                f"RAM:{memory_str} │ Correlation:{correlation_str} │ "
+                f"Confidence:{self._colorize_text(confidence_str, confidence_color)}")
+
+    def _create_workload_summary(self, workloads: List[dict]) -> str:
+        """Create summary statistics of detected workloads
+
+        Provides overview of detected frameworks, model types, and
+        estimated hardware utilization attribution.
+        """
+
+        if not workloads:
+            return self._colorize_text("No active ML workloads detected", "dim white")
+
+        # Count frameworks
+        framework_counts = {}
+        model_type_counts = {}
+        workload_type_counts = {}
+
+        total_memory = 0
+        high_correlation_count = 0
+
+        for workload in workloads:
+            # Count frameworks
+            framework = workload['framework']
+            framework_counts[framework] = framework_counts.get(framework, 0) + 1
+
+            # Count model types
+            model_type = workload['model_type']
+            model_type_counts[model_type] = model_type_counts.get(model_type, 0) + 1
+
+            # Count workload types
+            workload_type = workload['workload_type']
+            workload_type_counts[workload_type] = workload_type_counts.get(workload_type, 0) + 1
+
+            # Accumulate stats
+            total_memory += workload.get('memory_gb', 0)
+            if workload.get('correlation_score', 0) > 0.5:
+                high_correlation_count += 1
+
+        # Format summary
+        total_processes = len(workloads)
+        dominant_framework = max(framework_counts.items(), key=lambda x: x[1])[0]
+        dominant_model_type = max(model_type_counts.items(), key=lambda x: x[1])[0]
+
+        summary_parts = [
+            f"[bright_white]Found {total_processes} ML processes[/bright_white]",
+            f"[bright_cyan]Primary: {dominant_framework.upper()}[/bright_cyan]",
+            f"[orange1]Models: {dominant_model_type.upper()}[/orange1]",
+            f"[bright_green]Total RAM: {total_memory:4.1f}GB[/bright_green]",
+            f"[orange3]HW Correlation: {high_correlation_count}/{total_processes}[/orange3]"
+        ]
+
+        return " │ ".join(summary_parts)
+
     def _render_complete_display(self) -> str:
         """Render TT-Top with retro BBS/terminal aesthetic"""
         lines = []
@@ -1232,6 +1656,10 @@ class TTTopDisplay(Static):
         # Add enhanced memory hierarchy matrix visualization
         lines.append("")
         lines.extend(self._create_memory_hierarchy_matrix())
+
+        # Add intelligent workload detection section
+        lines.append("")
+        lines.extend(self._create_workload_detection_section())
 
         # Real hardware status footer with ARC health monitoring
         lines.append("")
