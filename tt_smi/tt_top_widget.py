@@ -11,13 +11,26 @@ Simplified for compatibility across different Textual versions.
 import time
 from typing import Dict, List
 from textual.widget import Widget
-from textual.widgets import Static, ScrollView
+from textual.widgets import Static
 from textual.containers import Container, Vertical
 from textual.app import ComposeResult
 from textual.events import Key
 from textual.binding import Binding
 from tt_smi.tt_smi_backend import TTSMIBackend
 from tt_smi import constants
+
+# Cross-platform ScrollView import for Textual compatibility
+try:
+    from textual.widgets import ScrollView
+except ImportError:
+    try:
+        from textual.containers import ScrollableContainer as ScrollView
+    except ImportError:
+        try:
+            from textual.scroll_view import ScrollView
+        except ImportError:
+            # Final fallback: use Container if ScrollView not available
+            ScrollView = Container
 
 
 class TTTopDisplay(Static):
