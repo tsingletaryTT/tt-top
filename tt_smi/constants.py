@@ -213,5 +213,9 @@ Use cursor or keyboard keys to navigate the app. The following table details the
 |   Go to device(s) telemetry tab     |        2        |          Switch to tab with telemetry info that is updated every 100ms           |
 |   Go to device(s) firmware tab     |        3        |          Switch to tab with all the fw versions on the board(s)          |
 |   Go to live monitor tab     |        4        |          Switch to tab with real-time hardware activity visualization (TT-Top)          |
+|   Scroll up in TT-Top        |   ↑ / Page Up   |          Scroll up in live monitor (when in tab 4)         |
+|   Scroll down in TT-Top      |   ↓ / Page Down |          Scroll down in live monitor (when in tab 4)       |
+|   Go to top of TT-Top        |      Home       |          Jump to top of live monitor content               |
+|   Go to bottom of TT-Top     |       End       |          Jump to bottom of live monitor content             |
 
 """
