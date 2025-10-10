@@ -28,6 +28,7 @@ class TTTopDisplay(Static):
         super().__init__(**kwargs)
         self.backend = backend
         self.animation_frame = 0
+        self.start_time = time.time()  # Track when the display was created
 
     def on_mount(self) -> None:
         """Set up periodic updates when mounted"""
@@ -48,13 +49,150 @@ class TTTopDisplay(Static):
             # Handle errors gracefully
             self.update(f"[red]Error updating display: {e}[/red]")
 
+    def _should_show_logo(self) -> bool:
+        """Check if logo should be displayed (only for first 5 seconds)"""
+        return (time.time() - self.start_time) < 5.0
+
+    def _get_status_color(self, temperature: float, power: float) -> str:
+        """Get color based on hardware status - systematic color mapping"""
+        if temperature > 80:
+            return "bold red"
+        elif temperature > 65:
+            return "orange3"  # Brown/orange instead of yellow
+        elif power > 200:
+            return "orange3"  # Brown/orange for high power
+        elif power > 50:
+            return "bright_green"
+        else:
+            return "bright_cyan"
+
+    def _get_temperature_color(self, temperature: float) -> str:
+        """Get temperature-specific color coding"""
+        if temperature > 80:
+            return "bold red"
+        elif temperature > 65:
+            return "orange3"  # Brown/orange instead of yellow
+        elif temperature > 45:
+            return "orange1"  # Lighter orange for warm
+        else:
+            return "bright_cyan"
+
+    def _get_power_color(self, power: float) -> str:
+        """Get power-specific color coding"""
+        if power > 75:
+            return "bold red"
+        elif power > 50:
+            return "orange3"  # Brown/orange instead of yellow
+        elif power > 25:
+            return "bright_green"
+        else:
+            return "bright_cyan"
+
+    def _create_border_line(self, content: str = "", style: str = "bright_cyan", end_char: str = "") -> str:
+        """Create bordered line with consistent styling"""
+        border_char = "║" if not end_char else end_char
+        return f"[{style}]{border_char}[/{style}] {content}"
+
+    def _colorize_text(self, text: str, color: str) -> str:
+        """Apply color markup to text"""
+        return f"[{color}]{text}[/{color}]"
+
+    def _get_status_indicator(self, power: float) -> tuple[str, str]:
+        """Get status block and icon based on power level - returns (block, icon)"""
+        if power > 50:
+            return (self._colorize_text("██████████", "bold red"),
+                   self._colorize_text("◉", "bold red"))
+        elif power > 25:
+            return (self._colorize_text("██████", "bold orange3") + self._colorize_text("▓▓▓▓", "dim white"),
+                   self._colorize_text("◎", "bold orange3"))
+        elif power > 10:
+            return (self._colorize_text("████", "bright_green") + self._colorize_text("▓▓▓▓▓▓", "dim white"),
+                   self._colorize_text("○", "bright_green"))
+        else:
+            return (self._colorize_text("▓▓▓▓▓▓▓▓▓▓", "dim white"),
+                   self._colorize_text("·", "dim white"))
+
+    def _get_device_status_text(self, temp: float, power: float) -> str:
+        """Get device status text with appropriate colors"""
+        if temp > 85:
+            return self._colorize_text("CRITICAL", "bold red")
+        elif temp > 75:
+            return self._colorize_text("HOT", "bold orange3")
+        elif power > 75:
+            return self._colorize_text("HIGH LOAD", "bold orange3")
+        elif power > 25:
+            return self._colorize_text("ACTIVE", "bold green")
+        elif power > 5:
+            return self._colorize_text("IDLE", "bold cyan")
+        else:
+            return self._colorize_text("SLEEP", "dim")
+
+    def _get_bandwidth_indicator(self, bandwidth: float) -> str:
+        """Get bandwidth utilization indicator with colors"""
+        if bandwidth > 50:
+            return (self._colorize_text("▓▓", "bold red") +
+                   self._colorize_text(f"{bandwidth:3.0f}", "orange1") + "  ")
+        elif bandwidth > 25:
+            return (self._colorize_text("▒▒", "bold orange3") +
+                   self._colorize_text(f"{bandwidth:3.0f}", "bright_white") + "  ")
+        elif bandwidth > 10:
+            return (self._colorize_text("░░", "bright_green") +
+                   self._colorize_text(f"{bandwidth:3.0f}", "bright_cyan") + "  ")
+        else:
+            return "  " + self._colorize_text(f"{bandwidth:3.0f}", "dim white") + "  "
+
+    def _get_event_color_and_text(self, power: float, temp: float, current: float, aiclk: float, event_type: str) -> str:
+        """Get colored event text based on telemetry and event type"""
+        if event_type == "power":
+            if power > 75:
+                return self._colorize_text("HIGH_POWER_STATE", "bold red") + f" {power:.1f}W " + self._colorize_text("(critical load)", "dim white")
+            elif power > 50:
+                return self._colorize_text("POWER_RAMP_UP", "bold orange3") + f" {power:.1f}W " + self._colorize_text("(increasing load)", "dim white")
+            elif power > 5:
+                return self._colorize_text("ACTIVE_WORKLOAD", "bright_green") + f" {power:.1f}W " + self._colorize_text("(processing)", "dim white")
+            else:
+                return self._colorize_text("IDLE_STATE", "dim white") + f" {power:.1f}W " + self._colorize_text("(standby)", "dim white")
+        elif event_type == "thermal":
+            if temp > 80:
+                return self._colorize_text("THERMAL_ALERT", "bold red") + f" {temp:.1f}°C " + self._colorize_text("(cooling req)", "dim white")
+            elif temp > 65:
+                return self._colorize_text("TEMP_WARNING", "bold orange3") + f" {temp:.1f}°C " + self._colorize_text("(elevated)", "dim white")
+        elif event_type == "current":
+            if current > 50:
+                return self._colorize_text("HIGH_CURRENT", "bright_magenta") + f" {current:.1f}A " + self._colorize_text("(peak demand)", "dim white")
+            elif current > 25:
+                return self._colorize_text("CURRENT_DRAW", "bright_cyan") + f" {current:.1f}A " + self._colorize_text("(active load)", "dim white")
+        elif event_type == "clock":
+            if aiclk > 1000:
+                return self._colorize_text("AICLK_BOOST", "orange1") + f" {aiclk:.0f}MHz " + self._colorize_text("(turbo mode)", "dim white")
+            elif aiclk > 800:
+                return self._colorize_text("AICLK_ACTIVE", "bright_white") + f" {aiclk:.0f}MHz " + self._colorize_text("(nominal)", "dim white")
+        return ""
+
+    def _create_section_header(self, title: str, border_style: str = "bright_cyan") -> str:
+        """Create section header with consistent formatting"""
+        return f"[{border_style}]┌─────────── [bold bright_white]{title}[/bold bright_white][/{border_style}]"
+
+    def _create_section_border(self, style: str = "bright_cyan") -> str:
+        """Create section border line"""
+        return f"[{style}]├──────────────────────────────────────────────────────────[/{style}]"
+
+    def _create_bordered_line(self, content: str, style: str = "bright_cyan") -> str:
+        """Create a bordered line with content"""
+        return f"[{style}]│[/{style}] {content}"
+
+    def _create_section_footer(self, style: str = "bright_cyan") -> str:
+        """Create section footer line"""
+        return f"[{style}]└──────────────────────────────────────────────────────────[/{style}]"
+
     def _render_complete_display(self) -> str:
         """Render TT-Top with retro BBS/terminal aesthetic"""
         lines = []
 
-        # BBS-style header with pixelated hardware avatar
-        lines.extend(self._create_bbs_header())
-        lines.append("")
+        # Show logo only for first 5 seconds
+        if self._should_show_logo():
+            lines.extend(self._create_compact_header())
+            lines.append("")
 
         # Main BBS-style display
         lines.extend(self._create_bbs_main_display())
@@ -652,19 +790,8 @@ class TTTopDisplay(Static):
             temp = float(telem.get('asic_temperature', '0.0'))
             aiclk = int(float(telem.get('aiclk', '0')))
 
-            # Determine status
-            if temp > 85:
-                status = "[bold red]CRITICAL[/bold red]"
-            elif temp > 75:
-                status = "[bold yellow]HOT[/bold yellow]"
-            elif power > 75:
-                status = "[bold yellow]HIGH LOAD[/bold yellow]"
-            elif power > 25:
-                status = "[bold green]ACTIVE[/bold green]"
-            elif power > 5:
-                status = "[bold cyan]IDLE[/bold cyan]"
-            else:
-                status = "[dim]SLEEP[/dim]"
+            # Determine status using systematic method
+            status = self._get_device_status_text(temp, power)
 
             device_data.append((i, device_name, board_type, voltage, current, power, temp, aiclk, status))
 
@@ -701,15 +828,15 @@ class TTTopDisplay(Static):
 
         return "\n".join(lines)
 
-    def _create_bbs_header(self) -> List[str]:
-        """Create TENSTORRENT ASCII header with hardware-responsive colors"""
+    def _create_compact_header(self) -> List[str]:
+        """Create compact TENSTORRENT header that disappears after 5 seconds"""
         lines = []
 
         # Calculate system health for color responsiveness
         total_devices = len(self.backend.devices)
         if total_devices == 0:
-            logo_color = "dim white"
             system_status = "NO DEVICES"
+            avg_temp, total_power = 0, 0
         else:
             # Get average temperature and power across all devices
             avg_temp = sum(float(self.backend.device_telemetrys[i].get('asic_temperature', '0'))
@@ -717,34 +844,24 @@ class TTTopDisplay(Static):
             total_power = sum(float(self.backend.device_telemetrys[i].get('power', '0'))
                              for i in range(total_devices))
 
-            # Logo color responds to system thermal state
             if avg_temp > 80:
-                logo_color = "bold red"
                 system_status = "THERMAL WARNING"
             elif avg_temp > 65:
-                logo_color = "bold yellow"
                 system_status = "ELEVATED TEMP"
             elif total_power > 200:
-                logo_color = "bright_yellow"
                 system_status = "HIGH POWER"
             elif total_power > 50:
-                logo_color = "bright_green"
                 system_status = "ACTIVE"
             else:
-                logo_color = "bright_cyan"
                 system_status = "READY"
 
-        lines.append("    [bright_cyan]╔══════════════════════════════════════════════════════════════════════════════[/bright_cyan]")
-        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]████████╗███████╗███╗   ██╗███████╗████████╗ ██████╗ ██████╗ ██████╗ ███████╗███╗   ██╗████████╗[/{logo_color}]")
-        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]╚══██╔══╝██╔════╝████╗  ██║██╔════╝╚══██╔══╝██╔═══██╗██╔══██╗██╔══██╗██╔════╝████╗  ██║╚══██╔══╝[/{logo_color}]")
-        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]   ██║   █████╗  ██╔██╗ ██║███████╗   ██║   ██║   ██║██████╔╝██████╔╝█████╗  ██╔██╗ ██║   ██║   [/{logo_color}]")
-        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]   ██║   ██╔══╝  ██║╚██╗██║╚════██║   ██║   ██║   ██║██╔══██╗██╔══██╗██╔══╝  ██║╚██╗██║   ██║   [/{logo_color}]")
-        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]   ██║   ███████╗██║ ╚████║███████║   ██║   ╚██████╔╝██║  ██║██║  ██║███████╗██║ ╚████║   ██║   [/{logo_color}]")
-        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]   ╚═╝   ╚══════╝╚═╝  ╚═══╝╚══════╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═══╝   ╚═╝   [/{logo_color}]")
-        lines.append(f"    [bright_cyan]║[/bright_cyan] [{logo_color}]                                   ╚═══ top ═══╝[/{logo_color}]")
-        lines.append("    [bright_cyan]║[/bright_cyan]")
-        lines.append(f"    [bright_cyan]║[/bright_cyan] [bright_white]tt-smi live monitor[/bright_white] [dim white]│[/dim white] [bright_white]Status:[/bright_white] [{logo_color}]{system_status}[/{logo_color}] [dim white]│[/dim white] [bright_white]Devices:[/bright_white] {total_devices}")
-        lines.append("    [bright_cyan]╚══════════════════════════════════════════════════════════════════════════════[/bright_cyan]")
+        # Get logo color using systematic method
+        logo_color = self._get_status_color(avg_temp, total_power)
+
+        # Compact 3-line logo
+        lines.append(f"    [bright_cyan]╔═══════════════════════════════════════════════════════════════════════════════════════════[/bright_cyan]")
+        lines.append(f"    [bright_cyan]║[/bright_cyan] [bold {logo_color}]TENSTORRENT • tt-top[/bold {logo_color}] [dim white]│[/dim white] [bright_white]Status:[/bright_white] [{logo_color}]{system_status}[/{logo_color}] [dim white]│[/dim white] [bright_white]Devices:[/bright_white] {total_devices} [dim white](Auto-hide in 5s)[/dim white]")
+        lines.append(f"    [bright_cyan]╚═══════════════════════════════════════════════════════════════════════════════════════════[/bright_cyan]")
 
         return lines
 
@@ -767,30 +884,20 @@ class TTTopDisplay(Static):
             current = float(telem.get('current', '0.0'))
             voltage = float(telem.get('voltage', '0.0'))
 
-            # Colorized status indicators based on power levels
-            if power > 50:
-                status_block = "[bold red]██████████[/bold red]"
-                status_icon = "[bold red]◉[/bold red]"
-            elif power > 25:
-                status_block = "[bold yellow]██████[/bold yellow][dim white]▓▓▓▓[/dim white]"
-                status_icon = "[bold yellow]◎[/bold yellow]"
-            elif power > 10:
-                status_block = "[bright_green]████[/bright_green][dim white]▓▓▓▓▓▓[/dim white]"
-                status_icon = "[bright_green]○[/bright_green]"
-            else:
-                status_block = "[dim white]▓▓▓▓▓▓▓▓▓▓[/dim white]"
-                status_icon = "[dim white]·[/dim white]"
+            # Get systematic status indicators
+            status_block, status_icon = self._get_status_indicator(power)
 
-            # Temperature readout with color coding
+            # Temperature readout with systematic color coding
             temp_display = f"{temp:05.1f}°C"
+            temp_color = self._get_temperature_color(temp)
             if temp > 80:
-                temp_status = "[bold red]CRIT[/bold red]"
+                temp_status = self._colorize_text("CRIT", "bold red")
             elif temp > 65:
-                temp_status = "[bold yellow] HOT[/bold yellow]"
+                temp_status = self._colorize_text(" HOT", temp_color)
             elif temp > 45:
-                temp_status = "[bright_yellow]WARM[/bright_yellow]"
+                temp_status = self._colorize_text("WARM", temp_color)
             else:
-                temp_status = "[bright_cyan]COOL[/bright_cyan]"
+                temp_status = self._colorize_text("COOL", temp_color)
 
             # Memory activity pattern based on real power consumption
             memory_banks = self._generate_memory_pattern(power, i)
@@ -803,11 +910,11 @@ class TTTopDisplay(Static):
                     colored_memory += "[dim white]◯[/dim white]"
 
             # Create BBS-style device entry with colors
-            device_line = f"[bright_cyan]│[/bright_cyan] [bright_white][[/bright_white][bright_yellow]{i}[/bright_yellow][bright_white]][/bright_white] [bold bright_white]{device_name:10s}[/bold bright_white] {status_icon} [bright_cyan]│[/bright_cyan]{status_block}[bright_cyan]│[/bright_cyan] [bright_white]{temp_display}[/bright_white] {temp_status}"
+            device_line = f"[bright_cyan]│[/bright_cyan] [bright_white][[/bright_white][orange1]{i}[/orange1][bright_white]][/bright_white] [bold bright_white]{device_name:10s}[/bold bright_white] {status_icon} [bright_cyan]│[/bright_cyan]{status_block}[bright_cyan]│[/bright_cyan] [bright_white]{temp_display}[/bright_white] {temp_status}"
             lines.append(device_line)
 
             # Technical readout line with subtle colors
-            tech_line = f"[bright_cyan]│[/bright_cyan]     [dim bright_white]{board_type:8s}[/dim bright_white] {colored_memory} [bright_cyan]{voltage:4.2f}V[/bright_cyan] [bright_green]{current:5.1f}A[/bright_green] [bright_yellow]{power:5.1f}W[/bright_yellow]"
+            tech_line = f"[bright_cyan]│[/bright_cyan]     [dim bright_white]{board_type:8s}[/dim bright_white] {colored_memory} [bright_cyan]{voltage:4.2f}V[/bright_cyan] [bright_green]{current:5.1f}A[/bright_green] [orange1]{power:5.1f}W[/orange1]"
             lines.append(tech_line)
 
             # Interconnect activity flow based on real current draw
@@ -870,13 +977,13 @@ class TTTopDisplay(Static):
         lines.append("[bright_cyan]┌─ [bold bright_white]HARDWARE STATUS[/bold bright_white] ────── [bright_cyan]┌─ [bold bright_white]MEMORY STATUS[/bold bright_white] ──── [bright_cyan]┌─ [bold bright_white]SYSTEM METRICS[/bold bright_white][/bright_cyan]")
 
         # Color code device status
-        device_status_color = "bright_green" if active_devices == total_devices else "bright_yellow" if active_devices > 0 else "red"
-        ddr_status_color = "bright_green" if ddr_trained_count == total_devices else "bright_yellow" if ddr_trained_count > 0 else "red"
+        device_status_color = "bright_green" if active_devices == total_devices else "orange3" if active_devices > 0 else "red"
+        ddr_status_color = "bright_green" if ddr_trained_count == total_devices else "orange3" if ddr_trained_count > 0 else "red"
 
         # Color code temperature
-        temp_color = "red" if avg_temp > 80 else "bright_yellow" if avg_temp > 65 else "bright_green"
+        temp_color = "red" if avg_temp > 80 else "orange3" if avg_temp > 65 else "bright_green"
 
-        lines.append(f"[bright_cyan]│[/bright_cyan] [bright_white]DEVICES:[/bright_white] [{device_status_color}]{active_devices}/{total_devices} ACTIVE[/{device_status_color}]     [bright_cyan]│[/bright_cyan] [bright_white]DDR TRAINED:[/bright_white] [{ddr_status_color}]{ddr_trained_count}/{total_devices}[/{ddr_status_color}]   [bright_cyan]│[/bright_cyan] [bright_white]TOTAL PWR:[/bright_white] [bright_yellow]{total_power:5.1f}W[/bright_yellow]")
+        lines.append(f"[bright_cyan]│[/bright_cyan] [bright_white]DEVICES:[/bright_white] [{device_status_color}]{active_devices}/{total_devices} ACTIVE[/{device_status_color}]     [bright_cyan]│[/bright_cyan] [bright_white]DDR TRAINED:[/bright_white] [{ddr_status_color}]{ddr_trained_count}/{total_devices}[/{ddr_status_color}]   [bright_cyan]│[/bright_cyan] [bright_white]TOTAL PWR:[/bright_white] [orange1]{total_power:5.1f}W[/orange1]")
         lines.append(f"[bright_cyan]│[/bright_cyan] [bright_white]ARC HEARTBEATS:[/bright_white] [bright_green]{arc_status}[/bright_green]     [bright_cyan]│[/bright_cyan] [bright_white]CHANNELS:[/bright_white] [bright_cyan]ACTIVE[/bright_cyan]     [bright_cyan]│[/bright_cyan] [bright_white]AVG TEMP:[/bright_white] [{temp_color}]{avg_temp:5.1f}°C[/{temp_color}]")
         lines.append(f"[bright_cyan]│[/bright_cyan] [bright_white]FRAMES:[/bright_white] [bright_magenta]{self.animation_frame:06d}[/bright_magenta]        [bright_cyan]│[/bright_cyan] [bright_white]REFRESH:[/bright_white] [bright_green]100ms[/bright_green]       [bright_cyan]│[/bright_cyan] [bright_white]AVG AICLK:[/bright_white] [bright_cyan]{avg_aiclk:4.0f}MHz[/bright_cyan]")
         lines.append("[bright_cyan]└─────────────────────── └─────────────────── └──────────────────[/bright_cyan]")
@@ -891,7 +998,7 @@ class TTTopDisplay(Static):
         lines.append("[bright_cyan]├────────────┼───────────────────────────────────────────┼─────[/bright_cyan]")
 
         chars = " ·∙▁▂▃▄▅▆▇█"
-        char_colors = ["dim white", "dim white", "dim white", "bright_cyan", "bright_cyan", "bright_green", "bright_yellow", "yellow", "red", "bold red", "bold red"]
+        char_colors = ["dim white", "dim white", "dim white", "bright_cyan", "bright_cyan", "bright_green", "orange1", "orange3", "red", "bold red", "bold red"]
 
         for i, device in enumerate(self.backend.devices):
             device_name = self.backend.get_device_name(device)[:10]
@@ -921,7 +1028,7 @@ class TTTopDisplay(Static):
             if power > 50:
                 current_indicator = "[bold red]████[/bold red]"
             elif power > 25:
-                current_indicator = "[bold yellow]███[/bold yellow][dim white]▓[/dim white]"
+                current_indicator = "[bold orange3]███[/bold orange3][dim white]▓[/dim white]"
             elif power > 10:
                 current_indicator = "[bright_green]██[/bright_green][dim white]▓▓[/dim white]"
             else:
@@ -968,14 +1075,7 @@ class TTTopDisplay(Static):
 
                     bandwidth = min(abs(current_i - current_j) * 2, 99)
 
-                    if bandwidth > 50:
-                        utilizations.append(f"[bold red]▓▓[/bold red][bright_yellow]{bandwidth:3.0f}[/bright_yellow]  ")
-                    elif bandwidth > 25:
-                        utilizations.append(f"[bold yellow]▒▒[/bold yellow][bright_white]{bandwidth:3.0f}[/bright_white]  ")
-                    elif bandwidth > 10:
-                        utilizations.append(f"[bright_green]░░[/bright_green][bright_cyan]{bandwidth:3.0f}[/bright_cyan]  ")
-                    else:
-                        utilizations.append(f"  [dim white]{bandwidth:3.0f}[/dim white]  ")
+                    utilizations.append(self._get_bandwidth_indicator(bandwidth))
 
             # Build row (no right border) with colors
             row_content = f"[bold bright_white]{device_name:8s}[/bold bright_white] [bright_cyan]│[/bright_cyan] " + " [bright_cyan]│[/bright_cyan] ".join(utilizations)
@@ -988,7 +1088,7 @@ class TTTopDisplay(Static):
 
         # Legend with colors
         lines.append("[bright_cyan]┌─ [bright_white]LEGEND[/bright_white][/bright_cyan]")
-        lines.append("[bright_cyan]│[/bright_cyan] [bold red]▓▓ HIGH (>50)[/bold red] [bold yellow]▒▒ MED (25-50)[/bold yellow] [bright_green]░░ LOW (10-25)[/bright_green]  [dim white]IDLE (<10)[/dim white]")
+        lines.append("[bright_cyan]│[/bright_cyan] [bold red]▓▓ HIGH (>50)[/bold red] [bold orange3]▒▒ MED (25-50)[/bold orange3] [bright_green]░░ LOW (10-25)[/bright_green]  [dim white]IDLE (<10)[/dim white]")
         lines.append("[bright_cyan]└─────────────────────────────────────────────────────────[/bright_cyan]")
 
         return lines
@@ -1024,7 +1124,7 @@ class TTTopDisplay(Static):
             if power > 75:
                 log_entries.append((event_time - 5, i, device_name, f"[bold red]HIGH_POWER_STATE[/bold red] {power:.1f}W [dim white](critical load)[/dim white]"))
             elif power > 50:
-                log_entries.append((event_time - 10, i, device_name, f"[bold yellow]POWER_RAMP_UP[/bold yellow] {power:.1f}W [dim white](increasing load)[/dim white]"))
+                log_entries.append((event_time - 10, i, device_name, f"[bold orange3]POWER_RAMP_UP[/bold orange3] {power:.1f}W [dim white](increasing load)[/dim white]"))
             elif power > 5:
                 log_entries.append((event_time - 15, i, device_name, f"[bright_green]ACTIVE_WORKLOAD[/bright_green] {power:.1f}W [dim white](processing)[/dim white]"))
             else:
@@ -1034,7 +1134,7 @@ class TTTopDisplay(Static):
             if temp > 80:
                 log_entries.append((event_time - 2, i, device_name, f"[bold red]THERMAL_ALERT[/bold red] {temp:.1f}°C [dim white](cooling req)[/dim white]"))
             elif temp > 65:
-                log_entries.append((event_time - 8, i, device_name, f"[bold yellow]TEMP_WARNING[/bold yellow] {temp:.1f}°C [dim white](elevated)[/dim white]"))
+                log_entries.append((event_time - 8, i, device_name, f"[bold orange3]TEMP_WARNING[/bold orange3] {temp:.1f}°C [dim white](elevated)[/dim white]"))
 
             # Current draw events
             if current > 50:
@@ -1044,7 +1144,7 @@ class TTTopDisplay(Static):
 
             # Clock frequency events
             if aiclk > 1000:
-                log_entries.append((event_time - 3, i, device_name, f"[bright_yellow]AICLK_BOOST[/bright_yellow] {aiclk:.0f}MHz [dim white](turbo mode)[/dim white]"))
+                log_entries.append((event_time - 3, i, device_name, f"[orange1]AICLK_BOOST[/orange1] {aiclk:.0f}MHz [dim white](turbo mode)[/dim white]"))
             elif aiclk > 800:
                 log_entries.append((event_time - 7, i, device_name, f"[bright_white]AICLK_ACTIVE[/bright_white] {aiclk:.0f}MHz [dim white](nominal)[/dim white]"))
 
@@ -1062,7 +1162,7 @@ class TTTopDisplay(Static):
             # Format timestamp
             time_str = f"{event_time % 100:02d}:{(event_time * 10) % 60:02d}"
 
-            line = f"[bright_cyan]│[/bright_cyan] [dim bright_white]{time_str}[/dim bright_white]      [bright_cyan]│[/bright_cyan] [bright_yellow]{dev_name}[/bright_yellow] [bright_cyan]│[/bright_cyan] {message}"
+            line = f"[bright_cyan]│[/bright_cyan] [dim bright_white]{time_str}[/dim bright_white]      [bright_cyan]│[/bright_cyan] [orange1]{dev_name}[/orange1] [bright_cyan]│[/bright_cyan] {message}"
             lines.append(line)
 
         # Fill remaining slots if we have fewer than 8 events
