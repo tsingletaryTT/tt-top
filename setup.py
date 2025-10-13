@@ -8,7 +8,7 @@ from setuptools import setup, find_packages
 import tomli
 
 if __name__ == "__main__":
-    with open("pyproject_tttop.toml", "rb") as f:
+    with open("pyproject.toml", "rb") as f:
         toml_data = tomli.load(f)
 
     setup(

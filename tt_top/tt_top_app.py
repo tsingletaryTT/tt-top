@@ -23,7 +23,10 @@ from textual.widgets import Footer
 
 from tt_top.tt_smi_backend import TTSMIBackend
 from tt_top.tt_top_widget import TTLiveMonitor
-from tt_top.log import logger
+
+# Set up logging
+import logging
+logger = logging.getLogger(__name__)
 
 
 class TTTopApp(App[None]):

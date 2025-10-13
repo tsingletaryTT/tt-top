@@ -2,7 +2,7 @@
 name = "tt-top"
 version = "1.0.0"
 description = "Real-time hardware monitoring for Tenstorrent silicon with advanced telemetry visualization"
-readme = "README_TTTOP.md"
+readme = "README.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
 authors = [

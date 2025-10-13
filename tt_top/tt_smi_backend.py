@@ -13,34 +13,46 @@ import sys
 import time
 import datetime
 import pkg_resources
-from tt_smi import log
+from tt_top import log
 from pathlib import Path
 from rich.table import Table
-from tt_smi import constants
+from tt_top import constants
 from rich import get_console
 from rich.syntax import Syntax
 from typing import Dict, List
 from rich.progress import track
-from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
-from tt_tools_common.reset_common.wh_reset import WHChipReset
-from tt_tools_common.reset_common.bh_reset import BHChipReset
-from tt_tools_common.reset_common.gs_tensix_reset import GSTensixReset
-from tt_tools_common.reset_common.galaxy_reset import GalaxyReset
-from pyluwen import (
-    PciChip,
-    run_wh_ubb_ipmi_reset,
-    run_ubb_wait_for_driver_load
-)
-from tt_tools_common.utils_common.system_utils import (
-    get_host_info,
-)
-from tt_tools_common.utils_common.tools_utils import (
-    hex_to_semver_m3_fw,
-    hex_to_date,
-    hex_to_semver_eth,
-    init_logging,
-    detect_chips_with_callback,
-)
+try:
+    from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
+    from tt_tools_common.reset_common.wh_reset import WHChipReset
+    from tt_tools_common.reset_common.bh_reset import BHChipReset
+    from tt_tools_common.reset_common.gs_tensix_reset import GSTensixReset
+    from tt_tools_common.reset_common.galaxy_reset import GalaxyReset
+    from pyluwen import (
+        PciChip,
+        run_wh_ubb_ipmi_reset,
+        run_ubb_wait_for_driver_load
+    )
+    from tt_tools_common.utils_common.system_utils import (
+        get_host_info,
+    )
+    from tt_tools_common.utils_common.tools_utils import (
+        hex_to_semver_m3_fw,
+        hex_to_date,
+        hex_to_semver_eth,
+        init_logging,
+        detect_chips_with_callback,
+    )
+    HARDWARE_AVAILABLE = True
+except ImportError:
+    # Fall back to mock hardware for development without hardware stack
+    from tt_top.mock_hardware import (
+        CMD_LINE_COLOR, WHChipReset, BHChipReset, GSTensixReset, GalaxyReset,
+        PciChip, run_wh_ubb_ipmi_reset, run_ubb_wait_for_driver_load,
+        get_host_info, hex_to_semver_m3_fw, hex_to_date, hex_to_semver_eth,
+        init_logging, detect_chips_with_callback
+    )
+    HARDWARE_AVAILABLE = False
+    print("⚠️  Hardware dependencies not available - using mock mode")
 
 LOG_FOLDER = os.path.expanduser("~/tt_smi_logs/")
 
@@ -684,10 +696,25 @@ def dict_from_public_attrs(obj) -> dict:
 
 
 def get_host_software_versions() -> dict:
-    return {
-        "tt_smi": pkg_resources.get_distribution("tt_smi").version,
-        "pyluwen": pkg_resources.get_distribution("pyluwen").version,
-    }
+    """Get host software versions, with fallbacks for missing packages"""
+    versions = {}
+
+    # Try to get tt-top version first, then fall back to tt_smi
+    try:
+        versions["tt_smi"] = pkg_resources.get_distribution("tt-top").version
+    except:
+        try:
+            versions["tt_smi"] = pkg_resources.get_distribution("tt_smi").version
+        except:
+            versions["tt_smi"] = "1.0.0-dev"
+
+    # Try to get pyluwen version
+    try:
+        versions["pyluwen"] = pkg_resources.get_distribution("pyluwen").version
+    except:
+        versions["pyluwen"] = "mock"
+
+    return versions
 
 
 # Reset specific functions
