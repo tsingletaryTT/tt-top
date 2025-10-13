@@ -253,16 +253,37 @@ def tt_top_main() -> int:
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
 
-        # Initialize backend
+        # Initialize backend with device detection
         logger.info("Initializing TT-Top hardware monitoring")
-        backend = TTSMIBackend()
+
+        # Import the device detection functionality
+        try:
+            from tt_top.tt_smi_backend import detect_chips_with_callback, HARDWARE_AVAILABLE
+            if HARDWARE_AVAILABLE:
+                logger.info("Detecting Tenstorrent devices...")
+                devices = detect_chips_with_callback(print_status=False)
+                if not devices:
+                    logger.warning("No Tenstorrent devices detected")
+                    return 1
+                logger.info(f"Found {len(devices)} Tenstorrent device(s)")
+            else:
+                logger.info("Using mock hardware for development")
+                from tt_top.mock_hardware import MockPciChip
+                devices = [MockPciChip(i) for i in range(1)]  # Create one mock device
+        except Exception as e:
+            logger.error(f"Failed to detect devices: {e}")
+            return 1
 
         # Apply device filtering if specified
         if args.device is not None:
-            if args.device >= len(backend.devices):
-                logger.error(f"Device {args.device} not found. Available devices: 0-{len(backend.devices)-1}")
+            if args.device >= len(devices):
+                logger.error(f"Device {args.device} not found. Available devices: 0-{len(devices)-1}")
                 return 1
+            devices = [devices[args.device]]  # Filter to single device
             logger.info(f"Monitoring device {args.device} only")
+
+        # Initialize backend with detected devices
+        backend = TTSMIBackend(devices=devices, fully_init=True)
 
         # Launch the TT-Top application
         app = TTTopApp(backend=backend)

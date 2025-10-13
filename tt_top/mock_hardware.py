@@ -36,19 +36,56 @@ BHChipReset = MockReset
 GSTensixReset = MockReset
 GalaxyReset = MockReset
 
+# Mock telemetry structure
+class MockTelemetryStruct:
+    def __init__(self):
+        # Mock telemetry attributes
+        self.board_id = 0x1234567890ABCDEF
+        self.vcore = 850  # mV
+        self.tdc = 30000 | (80000 << 16)  # 30A current | 80A limit
+        self.tdp = 150 | (200 << 16)  # 150W power | 200W limit
+        self.asic_temperature = 0x2D0000  # 45°C in fixed point
+        self.aiclk = 800 | (1000 << 16)  # 800MHz | 1000MHz max
+        self.arc0_health = 12000  # Heartbeat counter
+        self.arc3_health = 15000  # Heartbeat counter
+        self.timer_heartbeat = 18000  # BH heartbeat
+        self.ddr_speed = 3200
+        self.ddr_status = 0x22222222  # All channels trained (state 2)
+
+    def __dir__(self):
+        # Get attributes without causing recursion
+        return [attr for attr in object.__dir__(self) if not attr.startswith('_') and hasattr(self, attr)]
+
+# Mock chip type implementations
+class MockGSChip:
+    def get_telemetry(self):
+        return MockTelemetryStruct()
+
+class MockWHChip:
+    def get_telemetry(self):
+        return MockTelemetryStruct()
+
+class MockBHChip:
+    def get_telemetry(self):
+        return MockTelemetryStruct()
+
 # Mock PCI chip functionality
 class MockPciChip:
     def __init__(self, pci_interface=0):
         self.pci_interface = pci_interface
+        # Create mock chip types (simulate Grayskull by default)
+        self._gs = MockGSChip()
+        self._wh = None
+        self._bh = None
 
     def as_gs(self):
-        return None
+        return self._gs
 
     def as_wh(self):
-        return None
+        return self._wh
 
     def as_bh(self):
-        return None
+        return self._bh
 
     def is_remote(self):
         return False
