@@ -176,8 +176,9 @@ All visualizations update every 100ms with real hardware data.
 
     def on_key(self, event: events.Key) -> None:
         """Handle additional key events"""
-        # Allow parent to handle standard key bindings
-        super().on_key(event)
+        # The parent App class handles key bindings automatically via BINDINGS
+        # We don't need to explicitly call super().on_key() here
+        pass
 
 
 def parse_args() -> argparse.Namespace:

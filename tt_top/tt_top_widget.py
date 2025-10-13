@@ -1094,12 +1094,20 @@ class TTTopDisplay(Static):
 
         Provides overview of detected frameworks, model types, and
         estimated hardware utilization attribution.
+
+        Only counts KNOWN workloads - filters out unknown processes
+        to match the display logic and provide accurate ML job counts.
         """
 
-        if not workloads:
-            return self._colorize_text("No active ML workloads detected", "dim white")
+        # Filter out unknown workloads to match display behavior
+        known_workloads = [w for w in workloads if w['framework'] != 'unknown'
+                         and w['model_type'] != 'unknown'
+                         and w['workload_type'] != 'unknown']
 
-        # Count frameworks
+        if not known_workloads:
+            return self._colorize_text("No identified ML workloads found", "dim white")
+
+        # Count frameworks (only known ones)
         framework_counts = {}
         model_type_counts = {}
         workload_type_counts = {}
@@ -1107,7 +1115,7 @@ class TTTopDisplay(Static):
         total_memory = 0
         high_correlation_count = 0
 
-        for workload in workloads:
+        for workload in known_workloads:  # Only count known workloads
             # Count frameworks
             framework = workload['framework']
             framework_counts[framework] = framework_counts.get(framework, 0) + 1
@@ -1125,8 +1133,8 @@ class TTTopDisplay(Static):
             if workload.get('correlation_score', 0) > 0.5:
                 high_correlation_count += 1
 
-        # Format summary
-        total_processes = len(workloads)
+        # Format summary (only known processes counted)
+        total_processes = len(known_workloads)
         dominant_framework = max(framework_counts.items(), key=lambda x: x[1])[0]
         dominant_model_type = max(model_type_counts.items(), key=lambda x: x[1])[0]
 
