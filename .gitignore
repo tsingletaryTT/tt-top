@@ -1,25 +1,71 @@
-venv/
-.eggs/
-*.egg-info
-my-env/
-.ignored/
+# TT-Top specific gitignore
+
+# Python
 __pycache__/
-.vscode/
+*.py[cod]
+*$py.class
+*.so
+.Python
 build/
-.env/
-.venv/
-/target
-.py03-env
-/data
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
 *.swp
-vendor/
-.pybuild/
-built/
-.cargo/
-debian/*.substvars
-debian/*.install
-debian/*.debhelper
-debian/*.files
-debian/cargo_home/
-debian/debhelper-build-stamp
-debian/files
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# TT-Top specific
+*.tttop
+telemetry_cache/
+hardware_logs/
+
+# Development
+.pytest_cache/
+.coverage
+.tox/
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.mypy_cache/
+.dmypy.json
+dmypy.json

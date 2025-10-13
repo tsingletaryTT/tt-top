@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Compatibility setup.py for Ubuntu 22.04 packaging tools.
-Uses setuptools_scm for dynamic versioning from git tags.
+Setup.py for TT-Top - Standalone Tenstorrent Hardware Monitor.
+Forked from TT-SMI to create a dedicated real-time monitoring tool.
 """
 from setuptools import setup, find_packages
 
@@ -12,14 +12,14 @@ if __name__ == "__main__":
         toml_data = tomli.load(f)
 
     setup(
-        # Fallback for older setuptools versions
-        name="tt-smi",
+        # TT-Top specific configuration
+        name="tt-top",
         version=toml_data['project']['version'],
         packages=find_packages(),
         python_requires=">=3.10",
         entry_points={
             'console_scripts': [
-                'tt-smi = tt_smi:main',
+                'tt-top = tt_top:main',
             ]
         },
     )

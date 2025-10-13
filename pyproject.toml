@@ -1,7 +1,7 @@
 [project]
-name = "tt-smi"
-version = "3.0.31"
-description = "ncurses based hardware monitoring for Tenstorrent silicon"
+name = "tt-top"
+version = "1.0.0"
+description = "Real-time hardware monitoring for Tenstorrent silicon with advanced telemetry visualization"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
@@ -16,25 +16,24 @@ classifiers = [
   "Environment :: Console :: Curses",
   "License :: OSI Approved :: Apache Software License",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.7",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3 :: Only",
+  "Topic :: System :: Hardware",
+  "Topic :: System :: Monitoring",
 ]
 dependencies = [
   'distro>=1.8.0',
-  'elasticsearch>=8.11.0',
   'pydantic>=1.2',
   'tt_tools_common==1.4.29',
   'pyluwen==0.7.11',
   'rich>=13.7.0',
   'textual>=0.59.0',
-  'pre-commit>=3.5.0',
   'importlib_resources>=6.1.1',
   'setuptools',
   'tomli',
+  'psutil>=5.9.0',
 ]
 
 optional-dependencies.dev = [
@@ -45,11 +44,11 @@ optional-dependencies.dev = [
 
 [project.urls]
 "Homepage" = "http://tenstorrent.com"
-"Bug Reports" = "https://github.com/tenstorrent/tt-smi/issues"
-"Source" = "https://github.com/tenstorrent/tt-smi"
+"Bug Reports" = "https://github.com/tenstorrent/tt-top/issues"
+"Source" = "https://github.com/tenstorrent/tt-top"
 
 [project.scripts]
-tt-smi = "tt_smi:main"
+tt-top = "tt_top:main"
 
 [tool.setuptools]
 include-package-data = true

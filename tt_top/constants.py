@@ -154,38 +154,8 @@ MSG_TYPE_FW_VERSION = 0xB9
 #          GUI CONSTANTS
 ########################################
 
-INFO_TABLE_HEADER = [
-    "#",
-    "Bus ID",
-    "Board Type",
-    "Board ID",
-    "Coords",
-    "DRAM Trained",
-    "DRAM Speed",
-    "Link Speed",
-    "Link Width",
-]
 
-TELEMETRY_TABLE_HEADER = [
-    "#",
-    "Core Voltage (V)",
-    "Core Current (A)",
-    "AICLK (MHz)",
-    "Core Power (W)",
-    "Core Temp (°C)",
-    "Heartbeat",
-]
 
-FIRMWARES_TABLE_HEADER = [
-    "#",
-    "FW Bundle Version",
-    "TT-Flash Version",
-    "CM FW Version",
-    "CM FW Date",
-    "ETH FW Version",
-    "BM BL Version",
-    "BM App Version",
-]
 
 PCI_PROPERTIES = [
     "current_link_speed",
@@ -196,26 +166,3 @@ PCI_PROPERTIES = [
 
 # HELP MARKDOWN DOCUMENT
 
-HELP_MENU_MARKDOWN = """\
-# TT-SMI HELP MENU
-
-TT-SMI is a command-line utility that allows users to look at the telemetry and device information of Tenstorrent devices.
-
-## KEYBOARD SHORTCUTS
-
-Use cursor or keyboard keys to navigate the app. The following table details the keyboard keys that can be used and their functions
-
-|            Action            |    Key           |                     Detailed Description                     |
-| :--------------------------: | :--------------: | :----------------------------------------------------------: |
-|             Quit             |   q  |        Exit the program       |
-|             Help             |   h   |                   Opens up this help menu                   |
-|   Go to device(s) info tab  |        1        |          Switch to tab with device info         |
-|   Go to device(s) telemetry tab     |        2        |          Switch to tab with telemetry info that is updated every 100ms           |
-|   Go to device(s) firmware tab     |        3        |          Switch to tab with all the fw versions on the board(s)          |
-|   Go to live monitor tab     |        4        |          Switch to tab with real-time hardware activity visualization (TT-Top)          |
-|   Scroll up in TT-Top        |   ↑ / Page Up   |          Scroll up in live monitor (when in tab 4)         |
-|   Scroll down in TT-Top      |   ↓ / Page Down |          Scroll down in live monitor (when in tab 4)       |
-|   Go to top of TT-Top        |      Home       |          Jump to top of live monitor content               |
-|   Go to bottom of TT-Top     |       End       |          Jump to bottom of live monitor content             |
-
-"""
