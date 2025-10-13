@@ -16,8 +16,8 @@ from textual.containers import Container, Vertical
 from textual.app import ComposeResult
 from textual.events import Key
 from textual.binding import Binding
-from tt_smi.tt_smi_backend import TTSMIBackend
-from tt_smi import constants
+from tt_top.tt_smi_backend import TTSMIBackend
+from tt_top import constants
 
 # Cross-platform ScrollView import for Textual compatibility
 try:
