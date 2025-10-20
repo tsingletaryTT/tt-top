@@ -21,6 +21,13 @@ from rich import get_console
 from rich.syntax import Syntax
 from typing import Dict, List
 from rich.progress import track
+from tt_top.safety import (
+    get_safety_coordinator,
+    safe_hardware_access,
+    is_monitoring_safe,
+    SafetyConfig,
+    logger as safety_logger
+)
 try:
     from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
     from tt_tools_common.reset_common.wh_reset import WHChipReset
@@ -68,9 +75,15 @@ class TTSMIBackend:
         devices: List[PciChip],
         fully_init: bool = True,
         pretty_output: bool = True,
+        safety_config: SafetyConfig = None,
     ):
         self.devices = devices
         self.pretty_output = pretty_output
+
+        # Initialize hardware safety coordinator
+        self.safety_coordinator = get_safety_coordinator(safety_config)
+        safety_logger.info(f"TTSMIBackend initialized with {len(devices)} devices, safety enabled")
+
         self.log: log.TTSMILog = log.TTSMILog(
             time=datetime.datetime.now(),
             host_info=get_host_info(),
@@ -92,6 +105,7 @@ class TTSMIBackend:
         self.device_telemetrys = []
         self.chip_limits = []
         self.pci_properties = []
+        self.max_retries = 3  # Default retry count, can be overridden by CLI
 
         if fully_init:
             for i, device in track(
@@ -232,11 +246,115 @@ class TTSMIBackend:
                 smbus_telem_dict[key.upper()] = hex(value)
         return smbus_telem_dict
 
+    def _telemetry_read_with_retry(self, read_func, device_idx: int, operation_name: str, max_retries: int = None):
+        """Execute telemetry read operation with exponential backoff retry
+
+        Args:
+            read_func: Function to execute (e.g., self.get_smbus_board_info)
+            device_idx: Device index for logging and identification
+            operation_name: Human-readable operation name for logging
+            max_retries: Maximum number of retry attempts (default: 3)
+
+        Returns:
+            Result of read_func(device_idx) on success, or fallback/empty data on failure
+
+        Uses exponential backoff: 100ms, 200ms, 400ms delays between retries
+        to reduce contention during high PCIe traffic periods.
+        """
+        import time
+        import random
+
+        # Use instance variable if max_retries not specified
+        if max_retries is None:
+            max_retries = self.max_retries
+
+        last_exception = None
+
+        for attempt in range(max_retries + 1):  # 0, 1, 2, 3 (4 total attempts)
+            try:
+                result = read_func(device_idx)
+                if attempt > 0:
+                    safety_logger.info(f"Device {device_idx} {operation_name} succeeded on retry {attempt}")
+                return result
+
+            except Exception as e:
+                last_exception = e
+                safety_logger.warning(f"Device {device_idx} {operation_name} failed (attempt {attempt + 1}/{max_retries + 1}): {e}")
+
+                if attempt < max_retries:
+                    # Exponential backoff with jitter to reduce thundering herd
+                    base_delay = 0.1 * (2 ** attempt)  # 0.1s, 0.2s, 0.4s
+                    jitter = random.uniform(0.8, 1.2)  # ±20% randomization
+                    delay = base_delay * jitter
+
+                    safety_logger.debug(f"Retrying {operation_name} for device {device_idx} after {delay:.3f}s")
+                    time.sleep(delay)
+
+        # All retries exhausted - return fallback data
+        safety_logger.error(f"Device {device_idx} {operation_name} failed after {max_retries + 1} attempts: {last_exception}")
+        return self._get_fallback_data(operation_name)
+
+    def _get_fallback_data(self, operation_name: str):
+        """Get fallback data when telemetry reads fail completely
+
+        Returns safe default values to prevent display crashes while indicating
+        that real telemetry data is not available.
+        """
+        if "smbus" in operation_name.lower():
+            # Fallback for SMBUS telemetry - return empty dict with None values
+            return dict.fromkeys(constants.SMBUS_TELEMETRY_LIST, None)
+        elif "telemetry" in operation_name.lower():
+            # Fallback for chip telemetry - return safe zero values
+            return {
+                "voltage": "0.00",
+                "current": "0.0",
+                "power": "0.0",
+                "aiclk": "0",
+                "asic_temperature": "0.0",
+                "heartbeat": "0"
+            }
+        else:
+            # Generic fallback
+            return {}
+
     def update_telem(self):
-        """Update telemetry in a given interval"""
-        for i, _ in enumerate(self.devices):
-            self.smbus_telem_info[i] = self.get_smbus_board_info(i)
-            self.device_telemetrys[i] = self.get_chip_telemetry(i)
+        """Update telemetry with hardware safety coordination
+
+        Uses safety coordinator to:
+        - Check if monitoring is safe to perform
+        - Apply hardware access locking to prevent conflicts
+        - Respect dynamic polling intervals based on workload state
+        - Handle telemetry read failures gracefully
+        """
+        # Check if monitoring is currently safe
+        is_safe, reason = self.safety_coordinator.is_monitoring_safe()
+        if not is_safe:
+            safety_logger.warning(f"Skipping telemetry update: {reason}")
+            return
+
+        # Update telemetry for each device with hardware access coordination
+        for i, device in enumerate(self.devices):
+            device_id = i  # Use device index as identifier for locking
+
+            try:
+                # Use hardware access lock to coordinate with other processes
+                with safe_hardware_access(device_id) as lock:
+                    if not lock.is_locked():
+                        safety_logger.debug(f"Failed to acquire lock for device {i}, skipping telemetry read")
+                        continue
+
+                    # Safely read telemetry data with lock held and retry logic
+                    self.smbus_telem_info[i] = self._telemetry_read_with_retry(
+                        self.get_smbus_board_info, i, "SMBUS telemetry read"
+                    )
+                    self.device_telemetrys[i] = self._telemetry_read_with_retry(
+                        self.get_chip_telemetry, i, "chip telemetry read"
+                    )
+
+            except Exception as e:
+                safety_logger.error(f"Failed to read telemetry for device {i}: {e}")
+                # Continue with other devices even if one fails
+                continue
 
     def get_board_id(self, board_num) -> str:
         """Read board id from CSM or SPI if FW is not loaded"""

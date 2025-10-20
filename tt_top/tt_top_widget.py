@@ -46,13 +46,41 @@ class TTTopDisplay(Static):
         self.start_time = time.time()  # Track when the display was created
 
     def on_mount(self) -> None:
-        """Set up periodic updates when mounted"""
-        self.set_interval(constants.GUI_INTERVAL_TIME, self._update_display)
+        """Set up dynamic periodic updates with hardware safety coordination"""
+        # Start with initial safety-aware interval instead of fixed interval
+        self._schedule_safe_update()
+
+    def _schedule_safe_update(self) -> None:
+        """Schedule next update using safety coordinator's recommended interval
+
+        Uses the hardware safety coordinator to determine appropriate polling
+        frequency based on active workloads, PCIe error state, and system load.
+        """
+        try:
+            # Get safe polling interval from safety coordinator
+            safe_interval = self.backend.safety_coordinator.get_safe_poll_interval()
+
+            # Handle disabled monitoring (infinite interval)
+            if safe_interval == float('inf'):
+                # Monitoring disabled due to errors - check again in 30 seconds
+                safe_interval = 30.0
+
+            # Schedule next update with dynamic interval
+            self.set_timer(safe_interval, self._update_display)
+
+        except Exception as e:
+            # Fallback to fixed interval on error
+            from tt_top import constants
+            self.set_timer(constants.GUI_INTERVAL_TIME, self._update_display)
 
     def _update_display(self) -> None:
-        """Update the display with current data"""
+        """Update the display with current data using dynamic safety-aware polling
+
+        Updates telemetry through the safety coordinator, then schedules the
+        next update based on current system workload and hardware state.
+        """
         try:
-            # Update backend telemetry
+            # Update backend telemetry (now includes safety coordination)
             self.backend.update_telem()
             self.animation_frame += 1
 
@@ -63,6 +91,11 @@ class TTTopDisplay(Static):
         except Exception as e:
             # Handle errors gracefully
             self.update(f"[red]Error updating display: {e}[/red]")
+
+        finally:
+            # Always schedule next update with dynamic interval
+            # This creates continuous adaptive polling that responds to workload changes
+            self._schedule_safe_update()
 
     def _should_show_logo(self) -> bool:
         """Check if logo should be displayed (only for first 5 seconds)"""

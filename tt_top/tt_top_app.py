@@ -193,9 +193,19 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  tt-top                    # Start live monitoring
-  tt-top --device 0         # Monitor specific device
-  tt-top --log-level DEBUG  # Enable debug logging
+  tt-top                              # Start live monitoring with auto safety
+  tt-top --device 0                   # Monitor specific device
+  tt-top --safe-mode on               # Force safe polling (2s intervals)
+  tt-top --safe-mode off              # Disable safety (may interfere with workloads)
+  tt-top --poll-interval 0.5          # Custom 500ms polling (overrides safety)
+  tt-top --max-errors 5               # Allow 5 PCIe errors before disabling
+  tt-top --workload-check-interval 2  # Check for ML workloads every 2 seconds
+  tt-top --log-level DEBUG            # Enable debug logging
+
+Safety Modes:
+  auto (default) - Automatically detect workloads and adjust polling
+  on             - Force safe polling intervals (2s) regardless of workloads
+  off            - Use fast polling (100ms) - WARNING: may cause PCIe errors
 
 For more information, visit: https://github.com/tenstorrent/tt-top
         """,
@@ -216,6 +226,54 @@ For more information, visit: https://github.com/tenstorrent/tt-top
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         default="INFO",
         help="Set logging level (default: INFO)",
+    )
+
+    # Hardware safety options
+    parser.add_argument(
+        "--safe-mode",
+        choices=["auto", "on", "off"],
+        default="auto",
+        help="Hardware safety mode (auto: workload detection, on: force safe polling, off: disable safety)",
+    )
+
+    parser.add_argument(
+        "--poll-interval",
+        type=float,
+        default=None,
+        metavar="SECONDS",
+        help="Override polling interval in seconds (bypasses dynamic adjustment)",
+    )
+
+    parser.add_argument(
+        "--max-errors",
+        type=int,
+        default=3,
+        metavar="COUNT",
+        help="Maximum PCIe errors before disabling monitoring (default: 3)",
+    )
+
+    parser.add_argument(
+        "--workload-check-interval",
+        type=float,
+        default=1.0,
+        metavar="SECONDS",
+        help="How often to check for active workloads in seconds (default: 1.0)",
+    )
+
+    parser.add_argument(
+        "--lock-timeout",
+        type=float,
+        default=1.0,
+        metavar="SECONDS",
+        help="Maximum time to wait for hardware access lock in seconds (default: 1.0)",
+    )
+
+    parser.add_argument(
+        "--max-retries",
+        type=int,
+        default=3,
+        metavar="COUNT",
+        help="Maximum telemetry read retry attempts with exponential backoff (default: 3)",
     )
 
     # Backend options
@@ -283,8 +341,38 @@ def tt_top_main() -> int:
             devices = [devices[args.device]]  # Filter to single device
             logger.info(f"Monitoring device {args.device} only")
 
-        # Initialize backend with detected devices
-        backend = TTSMIBackend(devices=devices, fully_init=True)
+        # Configure hardware safety based on CLI arguments
+        from tt_top.safety import SafetyConfig
+        safety_config = SafetyConfig(
+            max_errors_before_disable=args.max_errors,
+            workload_check_interval=args.workload_check_interval,
+            max_lock_wait_time=args.lock_timeout,
+            # Set polling intervals based on CLI arguments
+            normal_poll_interval=args.poll_interval if args.poll_interval else 0.1,
+            workload_poll_interval=args.poll_interval if args.poll_interval else 2.0,
+            critical_poll_interval=args.poll_interval if args.poll_interval else 5.0,
+        )
+
+        # Initialize backend with detected devices and safety configuration
+        backend = TTSMIBackend(devices=devices, fully_init=True, safety_config=safety_config)
+
+        # Configure retry behavior based on CLI arguments
+        backend.max_retries = args.max_retries
+
+        # Apply CLI safety mode overrides
+        if args.safe_mode == "on":
+            logger.info("Forcing hardware safety mode ON via --safe-mode")
+            backend.safety_coordinator.force_safety_mode(True)
+        elif args.safe_mode == "off":
+            logger.warning("Hardware safety mode DISABLED via --safe-mode - monitoring may interfere with workloads")
+            backend.safety_coordinator.force_safety_mode(False)
+        else:  # auto mode
+            logger.info("Hardware safety mode AUTO - will detect workloads automatically")
+
+        # Apply custom polling interval override if specified
+        if args.poll_interval:
+            logger.info(f"Using custom polling interval: {args.poll_interval}s (overrides dynamic adjustment)")
+            backend.safety_coordinator.set_custom_poll_interval(args.poll_interval)
 
         # Launch the TT-Top application
         app = TTTopApp(backend=backend)

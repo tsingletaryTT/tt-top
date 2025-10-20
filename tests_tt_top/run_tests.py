@@ -25,7 +25,10 @@ TEST_PATTERNS = {
     'app': 'test_tt_top_app.py',
     'widget': 'test_tt_top_widget.py',
     'backend': 'test_backend_integration.py',
-    'performance': 'test_performance.py'
+    'performance': 'test_performance.py',
+    'safety': 'test_safety_*.py',
+    'safety_core': 'test_safety_core.py',
+    'safety_measures': 'test_safety_measures.py'
 }
 
 
@@ -157,10 +160,15 @@ def run_specific_tests():
             'description': 'Performance and stress tests',
             'time': '~90 seconds'
         },
+        'safety': {
+            'pattern': 'safety',
+            'description': 'Hardware safety coordination tests',
+            'time': '~60 seconds'
+        },
         'full': {
             'pattern': 'all',
             'description': 'Complete test suite',
-            'time': '~3 minutes'
+            'time': '~4 minutes'
         }
     }
 
@@ -183,11 +191,13 @@ Test Categories:
   functionality - Widget and display tests (~60s)
   integration - Backend integration tests (~45s)
   performance - Performance and stress tests (~90s)
-  full        - Complete test suite (~3min)
+  safety      - Hardware safety coordination tests (~60s)
+  full        - Complete test suite (~4min)
 
 Examples:
   python run_tests.py                    # Run all tests
   python run_tests.py quick              # Quick tests only
+  python run_tests.py safety             # Safety tests only
   python run_tests.py --verbose          # Detailed output
   python run_tests.py performance --failfast  # Stop on first failure
         """
@@ -197,7 +207,7 @@ Examples:
         'category',
         nargs='?',
         default='full',
-        choices=['quick', 'functionality', 'integration', 'performance', 'full'],
+        choices=['quick', 'functionality', 'integration', 'performance', 'safety', 'full'],
         help='Test category to run (default: full)'
     )
 
@@ -262,6 +272,7 @@ Examples:
         'functionality': 'widget',
         'integration': 'backend',
         'performance': 'performance',
+        'safety': 'safety',
         'full': 'all'
     }
 
