@@ -588,7 +588,154 @@ class TTSMIBackend:
 
         return chip_telemetry
 
-    def get_chip_telemetry(self, board_num) -> Dict:
+    def get_chip_architecture(self, device) -> str:
+        """Get chip architecture string for workload detection"""
+        if device.as_gs():
+            return "grayskull"
+        elif device.as_wh():
+            return "wormhole"
+        elif device.as_bh():
+            return "blackhole"
+        else:
+            return "wormhole"  # Default fallback
+
+    def detect_workload_state(self, board_num: int) -> dict:
+        """Intelligent workload detection using multiple telemetry signals
+        
+        Returns:
+            dict: {
+                'state': str,           # workload state key
+                'name': str,            # display name
+                'color': str,           # color for UI
+                'description': str,     # description
+                'power_delta': float,   # power above idle
+                'confidence': float     # detection confidence (0-1)
+            }
+        """
+        device = self.devices[board_num]
+        arch = self.get_chip_architecture(device)
+        telem = self.device_telemetrys[board_num]
+        
+        # Get telemetry values
+        power = float(telem.get('power', '0.0'))
+        temp = float(telem.get('asic_temperature', '0.0'))
+        current = float(telem.get('current', '0.0'))
+        aiclk = float(telem.get('aiclk', '0.0'))
+        
+        # Calculate power delta from idle baseline
+        idle_power = constants.CHIP_IDLE_POWER.get(arch, 25.0)
+        power_delta = max(0, power - idle_power)
+        
+        # Get detection thresholds
+        thresholds = constants.WORKLOAD_DETECTION
+        states = constants.WORKLOAD_STATES
+        
+        # Initialize confidence score
+        confidence = 0.5
+        
+        # Thermal limiting takes precedence
+        if temp > thresholds['thermal_critical']:
+            return {
+                'state': 'thermal_limit',
+                'power_delta': power_delta,
+                'confidence': 0.95,
+                **states['thermal_limit']
+            }
+        
+        # Determine workload state based on power delta and supporting signals
+        if power_delta < thresholds['idle_threshold']:
+            # Very low power delta - likely idle
+            state = 'idle'
+            if aiclk < 400 or current < 5.0:  # Supporting evidence for idle
+                confidence = 0.9
+            
+        elif power_delta < thresholds['light_threshold']:
+            # Light power usage - could be light load or still idle
+            if aiclk > thresholds['active_aiclk_min'] or current > thresholds['active_current_min']:
+                state = 'light'
+                confidence = 0.8
+            else:
+                state = 'idle'
+                confidence = 0.7
+                
+        elif power_delta < thresholds['moderate_threshold']:
+            # Moderate power usage - active workload
+            state = 'active'
+            if aiclk > thresholds['active_aiclk_min']:  # Clock frequency confirms activity
+                confidence = 0.9
+            elif temp > thresholds['thermal_active_min']:  # Temperature suggests processing
+                confidence = 0.8
+            else:
+                confidence = 0.7
+                
+        elif power_delta < thresholds['heavy_threshold']:
+            # Heavy power usage - moderate to heavy load
+            if aiclk > thresholds['boost_aiclk_min'] or current > thresholds['high_current_min']:
+                state = 'heavy'
+                confidence = 0.9
+            else:
+                state = 'moderate'
+                confidence = 0.8
+                
+        elif power_delta < thresholds['critical_threshold']:
+            # Very high power usage - heavy load
+            state = 'heavy'
+            confidence = 0.9
+            if temp > thresholds['thermal_warning']:  # High temp confirms heavy load
+                confidence = 0.95
+                
+        else:
+            # Extreme power usage - critical load
+            state = 'critical'
+            confidence = 0.95
+        
+        # Handle very low power case (sleep state)
+        if power < idle_power * 0.5:  # Less than half of idle power
+            state = 'sleep'
+            confidence = 0.9
+        
+        return {
+            'state': state,
+            'power_delta': power_delta,
+            'confidence': confidence,
+            **states[state]
+        }
+
+    def get_workload_event_text(self, board_num: int, event_type: str = "power") -> str:
+        """Get intelligent workload event text with color coding"""
+        workload = self.detect_workload_state(board_num)
+        telem = self.device_telemetrys[board_num]
+        
+        power = float(telem.get('power', '0.0'))
+        temp = float(telem.get('asic_temperature', '0.0'))
+        current = float(telem.get('current', '0.0'))
+        aiclk = float(telem.get('aiclk', '0.0'))
+        
+        name = workload['name']
+        color = workload['color']
+        desc = workload['description']
+        
+        if event_type == "power":
+            return f"[{color}]{name}[/{color}] {power:.1f}W [dim white]({desc})[/dim white]"
+        elif event_type == "thermal":
+            if temp > constants.WORKLOAD_DETECTION['thermal_critical']:
+                return f"[bold red]THERMAL_CRITICAL[/bold red] {temp:.1f}°C [dim white](limiting performance)[/dim white]"
+            elif temp > constants.WORKLOAD_DETECTION['thermal_warning']:
+                return f"[bold orange3]THERMAL_WARNING[/bold orange3] {temp:.1f}°C [dim white](elevated)[/dim white]"
+        elif event_type == "current":
+            if current > constants.WORKLOAD_DETECTION['high_current_min']:
+                return f"[bright_magenta]HIGH_CURRENT[/bright_magenta] {current:.1f}A [dim white](peak demand)[/dim white]"
+            elif current > constants.WORKLOAD_DETECTION['active_current_min']:
+                return f"[bright_cyan]CURRENT_DRAW[/bright_cyan] {current:.1f}A [dim white](active load)[/dim white]"
+        elif event_type == "clock":
+            if aiclk > constants.WORKLOAD_DETECTION['boost_aiclk_min']:
+                return f"[orange1]AICLK_BOOST[/orange1] {aiclk:.0f}MHz [dim white](turbo mode)[/dim white]"
+            elif aiclk > constants.WORKLOAD_DETECTION['active_aiclk_min']:
+                return f"[bright_white]AICLK_ACTIVE[/bright_white] {aiclk:.0f}MHz [dim white](nominal)[/dim white]"
+                
+        return ""
+
+    def get_chip_limits(self, board_num):
         """Return the correct chip telemetry for a given board"""
         if self.devices[board_num].as_bh():
             return self.get_bh_chip_telemetry(board_num)
