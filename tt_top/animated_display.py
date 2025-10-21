@@ -69,12 +69,14 @@ class HardwareStarfield:
 
         # Distribute devices across screen space
         device_spacing_x = self.width // max(num_devices, 1)
-        device_spacing_y = self.height // 3  # Use top 2/3 for devices
+        device_spacing_y = self.height // 2  # Use middle of screen as baseline
 
         for device_idx, device in enumerate(backend.devices):
-            # Device center position
+            # Device center position - spread devices across full screen
             center_x = device_spacing_x * device_idx + device_spacing_x // 2
-            center_y = device_spacing_y + (device_idx % 2) * 10  # Stagger vertically
+            # Stagger devices vertically across the middle portion of screen
+            vertical_offset = (device_idx % 2) * (self.height // 6) - (self.height // 12)
+            center_y = device_spacing_y + vertical_offset
 
             # Create core grid based on architecture
             if device.as_gs():
@@ -90,15 +92,18 @@ class HardwareStarfield:
                 grid_rows, grid_cols = 8, 10   # Default
                 cluster_size = 12
 
-            # Create stars for Tensix cores
-            for row in range(min(grid_rows, 6)):  # Limit for screen space
-                for col in range(min(grid_cols, 8)):
+            # Create stars for Tensix cores - distribute across more screen area
+            max_rows = min(grid_rows, self.height // 3)  # Use up to 1/3 of screen height per device
+            max_cols = min(grid_cols, self.width // 4)   # Use up to 1/4 of screen width per device
+
+            for row in range(max_rows):
+                for col in range(max_cols):
                     if star_id >= self.num_stars:
                         break
 
-                    # Position relative to device center
-                    star_x = center_x + (col - grid_cols//2) * 2
-                    star_y = center_y + (row - grid_rows//2)
+                    # Position relative to device center with more spread
+                    star_x = center_x + (col - max_cols//2) * 3  # Wider horizontal spacing
+                    star_y = center_y + (row - max_rows//2) * 2  # Taller vertical spacing
 
                     # Ensure star is within bounds
                     if 0 <= star_x < self.width and 0 <= star_y < self.height:
@@ -123,9 +128,9 @@ class HardwareStarfield:
                 if star_id >= self.num_stars:
                     break
 
-                # Position memory stars around device perimeter (closer)
+                # Position memory stars around device perimeter with better spacing
                 angle = 2 * math.pi * channel / memory_channels
-                radius = 8
+                radius = max(8, min(self.width // 8, self.height // 4))  # Adaptive radius
                 star_x = int(center_x + radius * math.cos(angle))
                 star_y = int(center_y + radius * math.sin(angle))
 
@@ -151,9 +156,10 @@ class HardwareStarfield:
                 if star_id >= self.num_stars:
                     break
 
-                # Position at different radii around device center
-                radius = 12 + level_idx * 4
-                angle = 2 * math.pi * level_idx / 3  # 3 levels
+                # Position at different radii around device center with better spread
+                base_radius = max(12, min(self.width // 6, self.height // 3))
+                radius = base_radius + level_idx * 6
+                angle = 2 * math.pi * level_idx / 3  # 3 levels, evenly spaced
                 planet_x = int(center_x + radius * math.cos(angle))
                 planet_y = int(center_y + radius * math.sin(angle))
 
@@ -180,11 +186,12 @@ class HardwareStarfield:
                 if star_id >= self.num_stars:
                     break
 
-                # Position between device centers
+                # Position between device centers with better distribution
                 device_i_x = device_spacing_x * i + device_spacing_x // 2
                 device_j_x = device_spacing_x * j + device_spacing_x // 2
                 interconnect_x = (device_i_x + device_j_x) // 2
-                interconnect_y = self.height * 2 // 3  # Lower part of screen
+                # Vary interconnect vertical position based on device pair
+                interconnect_y = self.height // 2 + ((i + j) % 3 - 1) * (self.height // 8)
 
                 if 0 <= interconnect_x < self.width and 0 <= interconnect_y < self.height:
                     star = {
