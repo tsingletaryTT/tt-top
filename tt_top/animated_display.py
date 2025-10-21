@@ -657,16 +657,31 @@ class HardwareResponsiveASCII(Static):
 
     def on_mount(self) -> None:
         """Initialize hardware-responsive animation systems"""
-        # Get actual display size
-        self.display_width = self.size.width
-        self.display_height = self.size.height - 2  # Account for borders
+        # Get actual display size with fallback
+        self.display_width = max(self.size.width, 80) if hasattr(self, 'size') and self.size else 80
+        self.display_height = max(self.size.height - 2, 25) if hasattr(self, 'size') and self.size else 25
+
+        # DEBUG: Show initialization info
+        init_debug = f"""
+[bright_yellow]INITIALIZING HARDWARE VISUALIZATION[/bright_yellow]
+Display Size: {self.display_width} x {self.display_height}
+Backend Devices: {len(self.backend.devices)}
+Initialization: Starting...
+"""
+        self.update(init_debug)
 
         # Reinitialize systems with correct size
         self.starfield = HardwareStarfield(self.display_width, self.display_height)
         self.data_streams = FlowingDataStreams(self.display_width, self.display_height)
 
         # Initialize starfield based on actual hardware
-        self.starfield.initialize_stars(self.backend)
+        try:
+            self.starfield.initialize_stars(self.backend)
+            init_debug += f"Stars: {len(self.starfield.stars)} created\n"
+        except Exception as e:
+            init_debug += f"Star creation error: {e}\n"
+
+        self.update(init_debug + "[green]Starting animation loop...[/green]")
 
         # Start animation loop
         self.set_interval(0.1, self._update_animation)  # 10 FPS for smooth animation
@@ -684,32 +699,103 @@ class HardwareResponsiveASCII(Static):
 
             # Render the complete visualization
             content = self._render_complete_visualization()
+
+            # DEBUG: Add content length info at start of content
+            content_lines = content.split('\n')
+            debug_info = f"[dim white]DEBUG: {len(content_lines)} lines, {len(content)} chars, Frame {self.frame_count}[/dim white]"
+
+            # Insert debug info after header
+            lines = content.split('\n')
+            if len(lines) > 5:  # After header
+                lines.insert(5, debug_info)
+                content = '\n'.join(lines)
+
             self.update(content)
 
         except Exception as e:
-            # Handle errors gracefully
-            self.update(f"[red]Animation Error: {e}[/red]")
+            # Handle errors gracefully with more debug info
+            import traceback
+            error_details = traceback.format_exc()
+            self.update(f"[red]Animation Error: {e}[/red]\n\nDebug info:\n{error_details}")
 
     def _render_complete_visualization(self) -> str:
         """Render the complete hardware-responsive visualization"""
+        try:
+            lines = []
+
+            # Add header with hardware status
+            header = self._create_visualization_header()
+            lines.extend(header)
+
+            # Render starfield
+            starfield_lines = self.starfield.render_starfield()
+
+            if not starfield_lines or len(starfield_lines) == 0:
+                # Fallback to simple text starfield
+                starfield_lines = self._render_simple_fallback_starfield()
+
+            # Add flowing data streams over starfield
+            enhanced_lines = self.data_streams.render_streams(starfield_lines)
+
+            lines.extend(enhanced_lines)
+
+            # Add footer with legend
+            footer = self._create_visualization_footer()
+            lines.extend(footer)
+
+            return "\n".join(lines)
+
+        except Exception as e:
+            # Complete fallback
+            return f"""
+[red]VISUALIZATION RENDERING ERROR[/red]
+
+Error: {e}
+Frame: {self.frame_count}
+Display: {self.display_width}x{self.display_height}
+Stars: {len(self.starfield.stars) if hasattr(self.starfield, 'stars') else 'unknown'}
+
+[yellow]SIMPLE FALLBACK STARFIELD:[/yellow]
+
+{self._render_simple_fallback_starfield_as_text()}
+
+Press 'v' to exit visualization mode
+"""
+
+    def _render_simple_fallback_starfield(self) -> List[str]:
+        """Render a simple text-based starfield as fallback"""
         lines = []
 
-        # Add header with hardware status
-        header = self._create_visualization_header()
-        lines.extend(header)
+        # Create simple starfield
+        for row in range(self.display_height):
+            line = ""
+            for col in range(self.display_width):
+                # Simple pattern based on frame and position
+                if (row + col + self.frame_count) % 12 == 0:
+                    line += "●"
+                elif (row + col + self.frame_count) % 8 == 0:
+                    line += "○"
+                elif (row + col + self.frame_count) % 15 == 0:
+                    line += "◉"
+                else:
+                    line += " "
+            lines.append(line)
 
-        # Render starfield
-        starfield_lines = self.starfield.render_starfield()
+        return lines
 
-        # Add flowing data streams over starfield
-        enhanced_lines = self.data_streams.render_streams(starfield_lines)
-
-        lines.extend(enhanced_lines)
-
-        # Add footer with legend
-        footer = self._create_visualization_footer()
-        lines.extend(footer)
-
+    def _render_simple_fallback_starfield_as_text(self) -> str:
+        """Render simple starfield as plain text"""
+        lines = []
+        for row in range(10):  # Smaller for error display
+            line = ""
+            for col in range(40):
+                if (row + col + self.frame_count) % 8 == 0:
+                    line += "*"
+                elif (row + col + self.frame_count) % 12 == 0:
+                    line += "o"
+                else:
+                    line += "."
+            lines.append(line)
         return "\n".join(lines)
 
     def _create_visualization_header(self) -> List[str]:

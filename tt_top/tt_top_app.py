@@ -163,8 +163,8 @@ class TTTopApp(App[None]):
         if self.live_monitor:
             self.live_monitor.display = False
 
-        # Create and mount animated display (using simple version for debugging)
-        self.animated_display = SimpleHardwareDisplay(
+        # Create and mount animated display (back to complex version)
+        self.animated_display = HardwareResponsiveASCII(
             backend=self.backend,
             id="animated_display"
         )
