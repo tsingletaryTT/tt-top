@@ -588,6 +588,29 @@ class TTSMIBackend:
 
         return chip_telemetry
 
+    def get_chip_telemetry(self, board_num: int) -> dict:
+        """Get chip telemetry using architecture-specific method
+
+        Routes to the appropriate telemetry method based on chip architecture.
+
+        Args:
+            board_num: Device index
+
+        Returns:
+            dict: Telemetry data for the specified device
+        """
+        device = self.devices[board_num]
+
+        if device.as_gs():
+            return self.get_gs_chip_telemetry(board_num)
+        elif device.as_wh():
+            return self.get_wh_chip_telemetry(board_num)
+        elif device.as_bh():
+            return self.get_bh_chip_telemetry(board_num)
+        else:
+            # Default to wormhole for unknown architectures
+            return self.get_wh_chip_telemetry(board_num)
+
     def get_chip_architecture(self, device) -> str:
         """Get chip architecture string for workload detection"""
         if device.as_gs():

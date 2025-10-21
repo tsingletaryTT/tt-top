@@ -23,6 +23,7 @@ from textual.widgets import Footer
 
 from tt_top.tt_smi_backend import TTSMIBackend
 from tt_top.tt_top_widget import TTLiveMonitor
+from tt_top.animated_display import HardwareResponsiveASCII
 
 # Set up logging
 import logging
@@ -50,6 +51,17 @@ class TTTopApp(App[None]):
         padding: 0;
     }
 
+    HardwareResponsiveASCII {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        background: black;
+        color: white;
+        border: none;
+        box-sizing: border-box;
+    }
+
     Footer {
         background: $surface;
         color: $text;
@@ -63,8 +75,9 @@ class TTTopApp(App[None]):
     BINDINGS = [
         Binding("q", "quit", "Quit", priority=True),
         Binding("h", "help", "Help", priority=True),
+        Binding("v", "toggle_visualization", "Toggle Visualization", priority=True),
         Binding("ctrl+c", "quit", "Quit", show=False),
-        Binding("escape", "quit", "Quit", show=False),
+        Binding("escape", "exit_mode", "Exit Mode", show=False),
         # Scrolling bindings for the live monitor
         Binding("up", "scroll_up", "Scroll Up", show=False),
         Binding("down", "scroll_down", "Scroll Down", show=False),
@@ -84,6 +97,8 @@ class TTTopApp(App[None]):
         super().__init__(**kwargs)
         self.backend = backend
         self.live_monitor: Optional[TTLiveMonitor] = None
+        self.animated_display: Optional[HardwareResponsiveASCII] = None
+        self.visualization_mode = False
 
     def compose(self) -> ComposeResult:
         """Compose the TT-Top application layout
@@ -115,6 +130,54 @@ class TTTopApp(App[None]):
         logger.info("TT-Top application shutting down")
         self.exit()
 
+    def action_toggle_visualization(self) -> None:
+        """Toggle between normal monitor and animated visualization"""
+        if self.visualization_mode:
+            self._exit_visualization_mode()
+        else:
+            self._enter_visualization_mode()
+
+    def action_exit_mode(self) -> None:
+        """Handle escape key - exit current mode or quit"""
+        if self.visualization_mode:
+            self._exit_visualization_mode()
+        else:
+            self.action_quit()
+
+    def _enter_visualization_mode(self) -> None:
+        """Enter full-screen animated visualization mode"""
+        self.visualization_mode = True
+
+        # Hide live monitor
+        if self.live_monitor:
+            self.live_monitor.display = False
+
+        # Create and mount animated display
+        self.animated_display = HardwareResponsiveASCII(
+            backend=self.backend,
+            id="animated_display"
+        )
+        self.mount(self.animated_display)
+
+        # Update subtitle to show mode
+        self.sub_title = "Hardware-Responsive Animated Visualization (Press 'v' to exit)"
+
+    def _exit_visualization_mode(self) -> None:
+        """Exit visualization mode and return to normal monitor"""
+        self.visualization_mode = False
+
+        # Remove animated display
+        if self.animated_display:
+            self.animated_display.remove()
+            self.animated_display = None
+
+        # Show live monitor
+        if self.live_monitor:
+            self.live_monitor.display = True
+
+        # Restore subtitle
+        self.sub_title = "Real-time telemetry and hardware visualization"
+
     def action_help(self) -> None:
         """Handle help action - show help message"""
         help_text = """
@@ -123,19 +186,28 @@ TT-Top Help
 TT-Top is a real-time hardware monitoring tool for Tenstorrent devices.
 
 KEYBOARD SHORTCUTS:
-  q, Ctrl+C, Esc  - Quit application
-  h               - Show this help
-  ↑/↓             - Scroll up/down
-  Page Up/Down    - Page up/down
-  Home/End        - Jump to top/bottom
+  q, Ctrl+C      - Quit application
+  h              - Show this help
+  v              - Toggle animated visualization mode
+  Esc            - Exit current mode (or quit if in normal mode)
+  ↑/↓            - Scroll up/down (normal mode)
+  Page Up/Down   - Page up/down (normal mode)
+  Home/End       - Jump to top/bottom (normal mode)
 
-DISPLAY SECTIONS:
-  • Hardware Status - Real-time device telemetry
-  • Memory Hierarchy - DDR channel and cache visualization
-  • Workload Detection - ML framework and process analysis
-  • Event Log - Live hardware event streaming
+DISPLAY MODES:
+  Normal Mode:
+    • Hardware Status - Real-time device telemetry
+    • Memory Hierarchy - DDR channel and cache visualization
+    • Workload Detection - ML framework and process analysis
+    • Event Log - Live hardware event streaming
 
-All visualizations update every 100ms with real hardware data.
+  Visualization Mode:
+    • Hardware-Responsive Starfield - Tensix cores as twinkling stars
+    • Memory Activity Patterns - DDR channels as colored blocks
+    • Interconnect Data Flows - Streaming patterns between devices
+    • Real-time Color Coding - Temperature/power responsive colors
+
+All animations and colors are driven by actual hardware telemetry data.
         """
         self.bell()
         # In a real implementation, you might want to show this in a modal
