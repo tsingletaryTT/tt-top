@@ -24,6 +24,7 @@ from textual.widgets import Footer
 from tt_top.tt_smi_backend import TTSMIBackend
 from tt_top.tt_top_widget import TTLiveMonitor
 from tt_top.animated_display import HardwareResponsiveASCII
+from tt_top.simple_animated_display import SimpleHardwareDisplay
 
 # Set up logging
 import logging
@@ -60,6 +61,16 @@ class TTTopApp(App[None]):
         color: white;
         border: none;
         box-sizing: border-box;
+    }
+
+    SimpleHardwareDisplay {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 1;
+        background: black;
+        color: white;
+        border: solid $accent;
     }
 
     Footer {
@@ -152,8 +163,8 @@ class TTTopApp(App[None]):
         if self.live_monitor:
             self.live_monitor.display = False
 
-        # Create and mount animated display
-        self.animated_display = HardwareResponsiveASCII(
+        # Create and mount animated display (using simple version for debugging)
+        self.animated_display = SimpleHardwareDisplay(
             backend=self.backend,
             id="animated_display"
         )
