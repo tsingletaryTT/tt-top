@@ -150,6 +150,51 @@ MAX_PCIE_SPEED = 4
 GUI_INTERVAL_TIME = 0.1
 MAGIC_FW_VERSION = 0x01030000
 MSG_TYPE_FW_VERSION = 0xB9
+
+########################################
+#       WORKLOAD DETECTION CONSTANTS
+########################################
+
+# Chip-specific idle power baselines (in watts)
+CHIP_IDLE_POWER = {
+    "grayskull": 15.0,   # GS baseline idle consumption
+    "wormhole": 25.0,    # WH baseline idle consumption  
+    "blackhole": 35.0,   # BH baseline idle consumption
+}
+
+# Workload detection thresholds (relative to idle power)
+WORKLOAD_DETECTION = {
+    "idle_threshold": 3.0,        # Power delta below which considered idle (watts)
+    "light_threshold": 10.0,      # Light workload threshold (watts above idle)
+    "moderate_threshold": 30.0,   # Moderate workload threshold (watts above idle)
+    "heavy_threshold": 60.0,      # Heavy workload threshold (watts above idle)
+    "critical_threshold": 100.0,  # Critical load threshold (watts above idle)
+    
+    # Clock frequency thresholds (MHz)
+    "active_aiclk_min": 800,      # Minimum AICLK for active workload
+    "boost_aiclk_min": 1000,      # Minimum AICLK for boost mode
+    
+    # Current draw thresholds (Amps)
+    "active_current_min": 15.0,   # Minimum current for active workload
+    "high_current_min": 40.0,     # High current draw threshold
+    
+    # Temperature thresholds (°C)
+    "thermal_active_min": 50.0,   # Temperature suggesting processing
+    "thermal_warning": 70.0,      # Temperature warning threshold
+    "thermal_critical": 85.0,     # Temperature critical threshold
+}
+
+# Workload state definitions
+WORKLOAD_STATES = {
+    "sleep": {"name": "SLEEP", "color": "dim", "description": "minimal activity"},
+    "idle": {"name": "IDLE", "color": "bold cyan", "description": "standby"},
+    "light": {"name": "LIGHT_LOAD", "color": "bright_green", "description": "light processing"},
+    "active": {"name": "ACTIVE_WORKLOAD", "color": "bright_green", "description": "processing"},
+    "moderate": {"name": "MODERATE_LOAD", "color": "orange1", "description": "substantial load"},
+    "heavy": {"name": "HEAVY_LOAD", "color": "bold orange3", "description": "high utilization"},
+    "critical": {"name": "CRITICAL_LOAD", "color": "bold red", "description": "maximum load"},
+    "thermal_limit": {"name": "THERMAL_LIMIT", "color": "bold red", "description": "thermal limiting"},
+}
 ########################################
 #          GUI CONSTANTS
 ########################################

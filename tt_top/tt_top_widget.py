@@ -46,13 +46,41 @@ class TTTopDisplay(Static):
         self.start_time = time.time()  # Track when the display was created
 
     def on_mount(self) -> None:
-        """Set up periodic updates when mounted"""
-        self.set_interval(constants.GUI_INTERVAL_TIME, self._update_display)
+        """Set up dynamic periodic updates with hardware safety coordination"""
+        # Start with initial safety-aware interval instead of fixed interval
+        self._schedule_safe_update()
+
+    def _schedule_safe_update(self) -> None:
+        """Schedule next update using safety coordinator's recommended interval
+
+        Uses the hardware safety coordinator to determine appropriate polling
+        frequency based on active workloads, PCIe error state, and system load.
+        """
+        try:
+            # Get safe polling interval from safety coordinator
+            safe_interval = self.backend.safety_coordinator.get_safe_poll_interval()
+
+            # Handle disabled monitoring (infinite interval)
+            if safe_interval == float('inf'):
+                # Monitoring disabled due to errors - check again in 30 seconds
+                safe_interval = 30.0
+
+            # Schedule next update with dynamic interval
+            self.set_timer(safe_interval, self._update_display)
+
+        except Exception as e:
+            # Fallback to fixed interval on error
+            from tt_top import constants
+            self.set_timer(constants.GUI_INTERVAL_TIME, self._update_display)
 
     def _update_display(self) -> None:
-        """Update the display with current data"""
+        """Update the display with current data using dynamic safety-aware polling
+
+        Updates telemetry through the safety coordinator, then schedules the
+        next update based on current system workload and hardware state.
+        """
         try:
-            # Update backend telemetry
+            # Update backend telemetry (now includes safety coordination)
             self.backend.update_telem()
             self.animation_frame += 1
 
@@ -63,6 +91,11 @@ class TTTopDisplay(Static):
         except Exception as e:
             # Handle errors gracefully
             self.update(f"[red]Error updating display: {e}[/red]")
+
+        finally:
+            # Always schedule next update with dynamic interval
+            # This creates continuous adaptive polling that responds to workload changes
+            self._schedule_safe_update()
 
     def _should_show_logo(self) -> bool:
         """Check if logo should be displayed (only for first 5 seconds)"""
@@ -127,20 +160,19 @@ class TTTopDisplay(Static):
             return (self._colorize_text("▓▓▓▓▓▓▓▓▓▓", "dim white"),
                    self._colorize_text("·", "dim white"))
 
-    def _get_device_status_text(self, temp: float, power: float) -> str:
-        """Get device status text with appropriate colors"""
+    def _get_device_status_text(self, device_idx: int) -> str:
+        """Get intelligent device status text with appropriate colors"""
+        workload = self.backend.detect_workload_state(device_idx)
+        temp = float(self.backend.device_telemetrys[device_idx].get('asic_temperature', '0.0'))
+        
+        # Thermal states take precedence
         if temp > 85:
             return self._colorize_text("CRITICAL", "bold red")
         elif temp > 75:
             return self._colorize_text("HOT", "bold orange3")
-        elif power > 75:
-            return self._colorize_text("HIGH LOAD", "bold orange3")
-        elif power > 25:
-            return self._colorize_text("ACTIVE", "bold green")
-        elif power > 5:
-            return self._colorize_text("IDLE", "bold cyan")
-        else:
-            return self._colorize_text("SLEEP", "dim")
+        
+        # Use intelligent workload detection
+        return self._colorize_text(workload['name'], workload['color'])
 
     def _get_bandwidth_indicator(self, bandwidth: float) -> str:
         """Get bandwidth utilization indicator with colors"""
@@ -156,33 +188,9 @@ class TTTopDisplay(Static):
         else:
             return "  " + self._colorize_text(f"{bandwidth:3.0f}", "dim white") + "  "
 
-    def _get_event_color_and_text(self, power: float, temp: float, current: float, aiclk: float, event_type: str) -> str:
-        """Get colored event text based on telemetry and event type"""
-        if event_type == "power":
-            if power > 75:
-                return self._colorize_text("HIGH_POWER_STATE", "bold red") + f" {power:.1f}W " + self._colorize_text("(critical load)", "dim white")
-            elif power > 50:
-                return self._colorize_text("POWER_RAMP_UP", "bold orange3") + f" {power:.1f}W " + self._colorize_text("(increasing load)", "dim white")
-            elif power > 5:
-                return self._colorize_text("ACTIVE_WORKLOAD", "bright_green") + f" {power:.1f}W " + self._colorize_text("(processing)", "dim white")
-            else:
-                return self._colorize_text("IDLE_STATE", "dim white") + f" {power:.1f}W " + self._colorize_text("(standby)", "dim white")
-        elif event_type == "thermal":
-            if temp > 80:
-                return self._colorize_text("THERMAL_ALERT", "bold red") + f" {temp:.1f}°C " + self._colorize_text("(cooling req)", "dim white")
-            elif temp > 65:
-                return self._colorize_text("TEMP_WARNING", "bold orange3") + f" {temp:.1f}°C " + self._colorize_text("(elevated)", "dim white")
-        elif event_type == "current":
-            if current > 50:
-                return self._colorize_text("HIGH_CURRENT", "bright_magenta") + f" {current:.1f}A " + self._colorize_text("(peak demand)", "dim white")
-            elif current > 25:
-                return self._colorize_text("CURRENT_DRAW", "bright_cyan") + f" {current:.1f}A " + self._colorize_text("(active load)", "dim white")
-        elif event_type == "clock":
-            if aiclk > 1000:
-                return self._colorize_text("AICLK_BOOST", "orange1") + f" {aiclk:.0f}MHz " + self._colorize_text("(turbo mode)", "dim white")
-            elif aiclk > 800:
-                return self._colorize_text("AICLK_ACTIVE", "bright_white") + f" {aiclk:.0f}MHz " + self._colorize_text("(nominal)", "dim white")
-        return ""
+    def _get_event_color_and_text(self, device_idx: int, event_type: str) -> str:
+        """Get intelligent event text using backend workload detection"""
+        return self.backend.get_workload_event_text(device_idx, event_type)
 
     def _create_section_header(self, title: str, border_style: str = "bright_cyan") -> str:
         """Create section header with consistent formatting"""
@@ -1754,7 +1762,7 @@ class TTTopDisplay(Static):
             aiclk = int(float(telem.get('aiclk', '0')))
 
             # Determine status using systematic method
-            status = self._get_device_status_text(temp, power)
+            status = self._get_device_status_text(i)
 
             device_data.append((i, device_name, board_type, voltage, current, power, temp, aiclk, status))
 
@@ -2091,33 +2099,25 @@ class TTTopDisplay(Static):
             timestamp_offset = (self.animation_frame + i) % 60
             event_time = current_time - timestamp_offset
 
-            # Power state events
-            if power > 75:
-                log_entries.append((event_time - 5, i, device_name, f"[bold red]HIGH_POWER_STATE[/bold red] {power:.1f}W [dim white](critical load)[/dim white]"))
-            elif power > 50:
-                log_entries.append((event_time - 10, i, device_name, f"[bold orange3]POWER_RAMP_UP[/bold orange3] {power:.1f}W [dim white](increasing load)[/dim white]"))
-            elif power > 5:
-                log_entries.append((event_time - 15, i, device_name, f"[bright_green]ACTIVE_WORKLOAD[/bright_green] {power:.1f}W [dim white](processing)[/dim white]"))
-            else:
-                log_entries.append((event_time - 20, i, device_name, f"[dim white]IDLE_STATE[/dim white] {power:.1f}W [dim white](standby)[/dim white]"))
+            # Power state events using intelligent detection
+            power_event_text = self.backend.get_workload_event_text(i, "power")
+            if power_event_text:
+                log_entries.append((event_time - 15, i, device_name, power_event_text))
 
-            # Temperature events
-            if temp > 80:
-                log_entries.append((event_time - 2, i, device_name, f"[bold red]THERMAL_ALERT[/bold red] {temp:.1f}°C [dim white](cooling req)[/dim white]"))
-            elif temp > 65:
-                log_entries.append((event_time - 8, i, device_name, f"[bold orange3]TEMP_WARNING[/bold orange3] {temp:.1f}°C [dim white](elevated)[/dim white]"))
+            # Temperature events using intelligent detection
+            thermal_event_text = self.backend.get_workload_event_text(i, "thermal")
+            if thermal_event_text:
+                log_entries.append((event_time - 2, i, device_name, thermal_event_text))
 
-            # Current draw events
-            if current > 50:
-                log_entries.append((event_time - 1, i, device_name, f"[bright_magenta]HIGH_CURRENT[/bright_magenta] {current:.1f}A [dim white](peak demand)[/dim white]"))
-            elif current > 25:
-                log_entries.append((event_time - 12, i, device_name, f"[bright_cyan]CURRENT_DRAW[/bright_cyan] {current:.1f}A [dim white](active load)[/dim white]"))
+            # Current draw events using intelligent detection
+            current_event_text = self.backend.get_workload_event_text(i, "current")
+            if current_event_text:
+                log_entries.append((event_time - 1, i, device_name, current_event_text))
 
-            # Clock frequency events
-            if aiclk > 1000:
-                log_entries.append((event_time - 3, i, device_name, f"[orange1]AICLK_BOOST[/orange1] {aiclk:.0f}MHz [dim white](turbo mode)[/dim white]"))
-            elif aiclk > 800:
-                log_entries.append((event_time - 7, i, device_name, f"[bright_white]AICLK_ACTIVE[/bright_white] {aiclk:.0f}MHz [dim white](nominal)[/dim white]"))
+            # Clock frequency events using intelligent detection
+            clock_event_text = self.backend.get_workload_event_text(i, "clock")
+            if clock_event_text:
+                log_entries.append((event_time - 3, i, device_name, clock_event_text))
 
             # ARC heartbeat events
             if heartbeat > 0:
