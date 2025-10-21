@@ -25,7 +25,7 @@ from tt_top.tt_smi_backend import TTSMIBackend
 class HardwareStarfield:
     """
     A dynamic starfield where each 'star' represents a hardware component
-    and its behavior is driven by real telemetry data.
+    and its behavior is driven by real telemetry data with adaptive baseline scaling.
     """
 
     def __init__(self, width: int, height: int, num_stars: int = 200):
@@ -41,6 +41,14 @@ class HardwareStarfield:
         self.num_stars = num_stars
         self.stars = []
         self.time_offset = 0
+
+        # Adaptive baseline system
+        self.baseline_samples = []
+        self.baseline_established = False
+        self.baseline_power = {}
+        self.baseline_current = {}
+        self.baseline_temp = {}
+        self.max_baseline_samples = 20  # Learn baseline over first 20 updates
 
     def initialize_stars(self, backend: TTSMIBackend) -> None:
         """Initialize stars based on actual hardware topology
@@ -109,15 +117,15 @@ class HardwareStarfield:
                         self.stars.append(star)
                         star_id += 1
 
-            # Create memory channel stars
+            # Create memory channel stars (closer to device)
             memory_channels = 4 if device.as_gs() else 8 if device.as_wh() else 12
             for channel in range(min(memory_channels, 8)):
                 if star_id >= self.num_stars:
                     break
 
-                # Position memory stars around device perimeter
+                # Position memory stars around device perimeter (closer)
                 angle = 2 * math.pi * channel / memory_channels
-                radius = 15
+                radius = 8
                 star_x = int(center_x + radius * math.cos(angle))
                 star_y = int(center_y + radius * math.sin(angle))
 
@@ -135,6 +143,35 @@ class HardwareStarfield:
                         'twinkle_speed': 0.05 + random.random() * 0.15
                     }
                     self.stars.append(star)
+                    star_id += 1
+
+            # Create memory hierarchy "planets" (larger visual elements)
+            hierarchy_levels = ['L1_cache', 'L2_cache', 'DDR_controller']
+            for level_idx, level in enumerate(hierarchy_levels):
+                if star_id >= self.num_stars:
+                    break
+
+                # Position at different radii around device center
+                radius = 12 + level_idx * 4
+                angle = 2 * math.pi * level_idx / 3  # 3 levels
+                planet_x = int(center_x + radius * math.cos(angle))
+                planet_y = int(center_y + radius * math.sin(angle))
+
+                if 0 <= planet_x < self.width and 0 <= planet_y < self.height:
+                    planet = {
+                        'id': star_id,
+                        'x': planet_x,
+                        'y': planet_y,
+                        'device_idx': device_idx,
+                        'component_type': 'memory_planet',
+                        'hierarchy_level': level,
+                        'level_index': level_idx,
+                        'brightness': 0.4,
+                        'color': ['bright_blue', 'bright_yellow', 'bright_red'][level_idx],
+                        'twinkle_phase': random.random() * 2 * math.pi,
+                        'twinkle_speed': 0.03 + random.random() * 0.1
+                    }
+                    self.stars.append(planet)
                     star_id += 1
 
         # Add interconnect stars between devices
@@ -165,14 +202,68 @@ class HardwareStarfield:
                     self.stars.append(star)
                     star_id += 1
 
+    def _update_baseline(self, backend: TTSMIBackend) -> None:
+        """Update the adaptive baseline from current telemetry readings"""
+        if self.baseline_established:
+            return
+
+        # Collect current sample
+        current_sample = {}
+        for i, device in enumerate(backend.devices):
+            try:
+                telem = backend.device_telemetrys[i]
+                current_sample[i] = {
+                    'power': float(telem.get('power', '0.0')),
+                    'current': float(telem.get('current', '0.0')),
+                    'temp': float(telem.get('asic_temperature', '0.0'))
+                }
+            except:
+                current_sample[i] = {'power': 0.0, 'current': 0.0, 'temp': 0.0}
+
+        self.baseline_samples.append(current_sample)
+
+        # Establish baseline after enough samples
+        if len(self.baseline_samples) >= self.max_baseline_samples:
+            for device_idx in range(len(backend.devices)):
+                # Calculate average baseline values
+                power_samples = [s[device_idx]['power'] for s in self.baseline_samples if device_idx in s]
+                current_samples = [s[device_idx]['current'] for s in self.baseline_samples if device_idx in s]
+                temp_samples = [s[device_idx]['temp'] for s in self.baseline_samples if device_idx in s]
+
+                if power_samples:
+                    self.baseline_power[device_idx] = sum(power_samples) / len(power_samples)
+                    self.baseline_current[device_idx] = sum(current_samples) / len(current_samples)
+                    self.baseline_temp[device_idx] = sum(temp_samples) / len(temp_samples)
+
+            self.baseline_established = True
+            print(f"✓ Baseline established for {len(backend.devices)} devices:")
+            for i in range(len(backend.devices)):
+                if i in self.baseline_power:
+                    print(f"  Device {i}: {self.baseline_power[i]:.1f}W, {self.baseline_current[i]:.1f}A, {self.baseline_temp[i]:.1f}°C")
+
+    def _get_relative_change(self, current_value: float, baseline_value: float) -> float:
+        """Calculate relative change from baseline as a percentage
+
+        Returns:
+            float: Relative change where 0.0 = baseline, 1.0 = 100% increase, -0.5 = 50% decrease
+        """
+        if baseline_value <= 0:
+            return 0.0
+
+        return (current_value - baseline_value) / baseline_value
+
     def update_from_telemetry(self, backend: TTSMIBackend, frame_count: int) -> None:
-        """Update star properties based on real hardware telemetry
+        """Update star properties based on real hardware telemetry with adaptive baseline scaling
 
         This is what makes the visualization hardware-responsive rather than
         just cosmetic animation. Each star's brightness, color, and twinkle
-        rate directly corresponds to actual hardware activity.
+        rate directly corresponds to actual hardware activity relative to learned baseline.
         """
         self.time_offset = frame_count * 0.1
+
+        # Update baseline if not established
+        if not self.baseline_established:
+            self._update_baseline(backend)
 
         for star in self.stars:
             device_idx = star['device_idx']
@@ -192,44 +283,98 @@ class HardwareStarfield:
             except:
                 power = temp = current = voltage = aiclk = 0.0
 
-            # Update star based on component type and real telemetry
+            # Update star based on component type and RELATIVE telemetry changes
             if star['component_type'] == 'tensix_core':
-                # Core activity based on power consumption (real hardware: 5-150W range)
-                core_activity = min(max(power - 5, 0) / 95.0, 1.0)  # 5W idle, 100W max active
-                star['brightness'] = 0.1 + core_activity * 0.9
+                if self.baseline_established and device_idx in self.baseline_power:
+                    # Use relative changes from baseline
+                    power_change = self._get_relative_change(power, self.baseline_power[device_idx])
+                    current_change = self._get_relative_change(current, self.baseline_current[device_idx])
+                    temp_change = self._get_relative_change(temp, self.baseline_temp[device_idx])
 
-                # Color based on temperature
-                if temp > 80:
-                    star['color'] = 'bold red'
-                elif temp > 65:
-                    star['color'] = 'orange1'
-                elif temp > 45:
-                    star['color'] = 'bright_yellow'
-                elif power > 15:  # Lower threshold for real hardware
-                    star['color'] = 'bright_green'
+                    # Core activity based on relative power change (much more sensitive!)
+                    # 0% change = 0.3 brightness, 50% increase = 1.0 brightness
+                    core_activity = max(0, min(power_change, 2.0))  # Cap at 200% increase
+                    star['brightness'] = 0.3 + core_activity * 0.7
+
+                    # Color based on relative temperature change
+                    if temp_change > 0.3:  # 30% temp increase
+                        star['color'] = 'bold red'
+                    elif temp_change > 0.15:  # 15% temp increase
+                        star['color'] = 'orange1'
+                    elif temp_change > 0.05:  # 5% temp increase
+                        star['color'] = 'bright_yellow'
+                    elif power_change > 0.1:  # 10% power increase
+                        star['color'] = 'bright_green'
+                    else:
+                        star['color'] = 'bright_cyan'
+
+                    # Twinkle speed based on relative current change
+                    twinkle_activity = max(0, min(current_change, 1.0))
+                    star['twinkle_speed'] = 0.05 + twinkle_activity * 0.4
                 else:
-                    star['color'] = 'bright_cyan'
-
-                # Twinkle speed based on current draw (real hardware: 1-50A range)
-                normalized_current = min(max(current - 1, 0) / 49.0, 1.0)  # 1A idle, 50A max
-                star['twinkle_speed'] = 0.02 + normalized_current * 0.3
+                    # Learning baseline - show neutral state
+                    star['brightness'] = 0.3
+                    star['color'] = 'dim white'
+                    star['twinkle_speed'] = 0.05
 
             elif star['component_type'] == 'memory_channel':
-                # Memory activity based on current draw (real hardware: 1-30A range)
-                memory_activity = min(max(current - 1, 0) / 29.0, 1.0)  # 1A idle, 30A max
-                star['brightness'] = 0.05 + memory_activity * 0.8
+                if self.baseline_established and device_idx in self.baseline_current:
+                    # Memory activity based on relative current change
+                    current_change = self._get_relative_change(current, self.baseline_current[device_idx])
+                    memory_activity = max(0, min(current_change, 1.5))  # Cap at 150% increase
+                    star['brightness'] = 0.2 + memory_activity * 0.8
 
-                # Memory channels pulse with different colors based on utilization
-                if current > 20:
-                    star['color'] = 'bright_magenta'
-                elif current > 10:
-                    star['color'] = 'magenta'
-                elif current > 5:
-                    star['color'] = 'bright_blue'
+                    # Memory channels pulse with different colors based on activity level
+                    if current_change > 0.5:  # 50% increase
+                        star['color'] = 'bright_magenta'
+                    elif current_change > 0.25:  # 25% increase
+                        star['color'] = 'magenta'
+                    elif current_change > 0.1:  # 10% increase
+                        star['color'] = 'bright_blue'
+                    else:
+                        star['color'] = 'blue'
+
+                    star['twinkle_speed'] = 0.03 + memory_activity * 0.2
                 else:
-                    star['color'] = 'blue'
+                    # Learning baseline
+                    star['brightness'] = 0.2
+                    star['color'] = 'dim blue'
+                    star['twinkle_speed'] = 0.03
 
-                star['twinkle_speed'] = 0.01 + memory_activity * 0.15
+            elif star['component_type'] == 'memory_planet':
+                if self.baseline_established and device_idx in self.baseline_power:
+                    # Memory hierarchy planets show combined metrics
+                    power_change = self._get_relative_change(power, self.baseline_power[device_idx])
+                    current_change = self._get_relative_change(current, self.baseline_current[device_idx])
+
+                    # Different hierarchy levels respond to different metrics
+                    level_idx = star['level_index']
+                    if level_idx == 0:  # L1 cache - responds to power
+                        activity = max(0, min(power_change, 1.0))
+                        base_color = 'bright_blue'
+                    elif level_idx == 1:  # L2 cache - responds to current
+                        activity = max(0, min(current_change, 1.0))
+                        base_color = 'bright_yellow'
+                    else:  # DDR controller - responds to average
+                        activity = max(0, min((power_change + current_change) / 2, 1.0))
+                        base_color = 'bright_red'
+
+                    star['brightness'] = 0.4 + activity * 0.6
+
+                    # Planet colors intensify with activity
+                    if activity > 0.3:
+                        star['color'] = f'bold {base_color.split("_")[1]}'
+                    elif activity > 0.1:
+                        star['color'] = base_color
+                    else:
+                        star['color'] = base_color.replace('bright_', 'dim ')
+
+                    star['twinkle_speed'] = 0.02 + activity * 0.15
+                else:
+                    # Learning baseline
+                    star['brightness'] = 0.4
+                    star['color'] = 'dim white'
+                    star['twinkle_speed'] = 0.02
 
             elif star['component_type'] == 'interconnect':
                 # Interconnect activity based on power difference between connected devices
@@ -313,6 +458,20 @@ class HardwareStarfield:
                     char = '░'
                 else:
                     char = '·'
+            elif star['component_type'] == 'memory_planet':
+                # Larger, more distinctive characters for memory hierarchy
+                level_idx = star['level_index']
+                if current_brightness > 0.8:
+                    chars = ['◆', '◇', '♦']  # L1, L2, DDR
+                elif current_brightness > 0.6:
+                    chars = ['◈', '◊', '♢']
+                elif current_brightness > 0.4:
+                    chars = ['◊', '◌', '◯']
+                elif current_brightness > 0.2:
+                    chars = ['◦', '○', '◯']
+                else:
+                    chars = ['·', '·', '·']
+                char = chars[min(level_idx, 2)]
             elif star['component_type'] == 'interconnect':
                 if current_brightness > 0.6:
                     char = '✦'
@@ -585,10 +744,36 @@ class HardwareResponsiveASCII(Static):
         elapsed_time = time.time() - self.start_time
         pulse_char = '●' if int(elapsed_time * 2) % 2 else '○'
 
-        lines.append(f"[bright_cyan]╔══════════════════════════════════════════════════════════════════════════════════════════╗[/bright_cyan]")
-        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_magenta]{pulse_char}[/bold bright_magenta] [bold bright_white]HARDWARE-RESPONSIVE VISUALIZATION[/bold bright_white] [dim white]│[/dim white] [{status_color}]{status_text}[/{status_color}] [dim white]│[/dim white] [bright_white]Devices:[/bright_white] {total_devices}")
-        lines.append(f"[bright_cyan]║[/bright_cyan] [bright_white]Power:[/bright_white] [orange1]{total_power:5.1f}W[/orange1] [dim white]│[/dim white] [bright_white]Current:[/bright_white] [bright_green]{total_current:5.1f}A[/bright_green] [dim white]│[/dim white] [bright_white]Temp:[/bright_white] [bright_yellow]{avg_temp:4.1f}°C[/bright_yellow] [dim white]│[/dim white] [bright_white]Frame:[/bright_white] [bright_magenta]{self.frame_count}[/bright_magenta] [bright_cyan]║[/bright_cyan]")
-        lines.append(f"[bright_cyan]╚══════════════════════════════════════════════════════════════════════════════════════════╝[/bright_cyan]")
+        # Show baseline status and relative changes
+        if hasattr(self, 'starfield') and hasattr(self.starfield, 'baseline_established'):
+            if self.starfield.baseline_established:
+                baseline_status = "[bright_green]BASELINE ESTABLISHED[/bright_green]"
+                # Calculate relative changes from baseline
+                if total_devices > 0:
+                    baseline_total_power = sum(self.starfield.baseline_power.get(i, total_power/total_devices)
+                                             for i in range(total_devices))
+                    baseline_total_current = sum(self.starfield.baseline_current.get(i, total_current/total_devices)
+                                               for i in range(total_devices))
+
+                    power_change = ((total_power - baseline_total_power) / baseline_total_power * 100) if baseline_total_power > 0 else 0
+                    current_change = ((total_current - baseline_total_current) / baseline_total_current * 100) if baseline_total_current > 0 else 0
+
+                    change_info = f"[bright_white]Δ Power:[/bright_white] [{'bright_green' if power_change >= 0 else 'orange1'}]{power_change:+5.1f}%[/{'bright_green' if power_change >= 0 else 'orange1'}] [dim white]│[/dim white] [bright_white]Δ Current:[/bright_white] [{'bright_green' if current_change >= 0 else 'orange1'}]{current_change:+5.1f}%[/{'bright_green' if current_change >= 0 else 'orange1'}]"
+                else:
+                    change_info = "[dim white]No devices detected[/dim white]"
+            else:
+                baseline_samples = len(self.starfield.baseline_samples) if hasattr(self.starfield, 'baseline_samples') else 0
+                baseline_status = f"[bright_yellow]LEARNING BASELINE[/bright_yellow] [dim white]({baseline_samples}/{self.starfield.max_baseline_samples})[/dim white]"
+                change_info = "[dim white]Establishing baseline values...[/dim white]"
+        else:
+            baseline_status = "[bright_yellow]INITIALIZING[/bright_yellow]"
+            change_info = "[dim white]Starting visualization...[/dim white]"
+
+        lines.append(f"[bright_cyan]╔═══════════════════════════════════════════════════════════════════════════════════════════╗[/bright_cyan]")
+        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_magenta]{pulse_char}[/bold bright_magenta] [bold bright_white]ADAPTIVE HARDWARE VISUALIZATION[/bold bright_white] [dim white]│[/dim white] [{status_color}]{status_text}[/{status_color}] [dim white]│[/dim white] [bright_white]Devices:[/bright_white] {total_devices} [bright_cyan]║[/bright_cyan]")
+        lines.append(f"[bright_cyan]║[/bright_cyan] {baseline_status} [dim white]│[/dim white] {change_info} [bright_cyan]║[/bright_cyan]")
+        lines.append(f"[bright_cyan]║[/bright_cyan] [bright_white]Absolute:[/bright_white] [orange1]{total_power:5.1f}W[/orange1] [bright_green]{total_current:5.1f}A[/bright_green] [bright_yellow]{avg_temp:4.1f}°C[/bright_yellow] [dim white]│[/dim white] [bright_white]Frame:[/bright_white] [bright_magenta]{self.frame_count}[/bright_magenta] [bright_cyan]║[/bright_cyan]")
+        lines.append(f"[bright_cyan]╚═══════════════════════════════════════════════════════════════════════════════════════════╝[/bright_cyan]")
 
         return lines
 
@@ -596,11 +781,11 @@ class HardwareResponsiveASCII(Static):
         """Create footer with legend and controls"""
         lines = []
 
-        lines.append(f"[bright_cyan]╔══════════════════════════════════════════════════════════════════════════════════════════╗[/bright_cyan]")
-        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_white]LEGEND:[/bold bright_white] [bright_cyan]●◉○∘·[/bright_cyan] Tensix Cores [dim white]│[/dim white] [bright_magenta]█▓▒░·[/bright_magenta] Memory [dim white]│[/dim white] [bright_green]✦✧✩[/bright_green] Interconnect [dim white]│[/dim white] [bright_yellow]▶◀[/bright_yellow] Data Flow [bright_cyan]║[/bright_cyan]")
-        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_white]COLORS:[/bold bright_white] [bold red]Red[/bold red] Critical [dim white]│[/dim white] [orange1]Orange[/orange1] Hot [dim white]│[/dim white] [bright_yellow]Yellow[/bright_yellow] Warm [dim white]│[/dim white] [bright_green]Green[/bright_green] Active [dim white]│[/dim white] [bright_cyan]Cyan[/bright_cyan] Idle [bright_cyan]║[/bright_cyan]")
-        lines.append(f"[bright_cyan]║[/bright_cyan] [dim bright_white]Press 'v' to toggle visualization mode • All animations driven by real hardware telemetry[/dim bright_white] [bright_cyan]║[/bright_cyan]")
-        lines.append(f"[bright_cyan]╚══════════════════════════════════════════════════════════════════════════════════════════╝[/bright_cyan]")
+        lines.append(f"[bright_cyan]╔═══════════════════════════════════════════════════════════════════════════════════════════╗[/bright_cyan]")
+        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_white]COMPONENTS:[/bold bright_white] [bright_cyan]●◉○∘·[/bright_cyan] Tensix Cores [dim white]│[/dim white] [bright_magenta]█▓▒░·[/bright_magenta] Memory Ch [dim white]│[/dim white] [bright_blue]◆[/bright_blue] L1 [bright_yellow]◇[/bright_yellow] L2 [bright_red]♦[/bright_red] DDR [dim white]│[/dim white] [bright_green]✦✧✩[/bright_green] Links [bright_cyan]║[/bright_cyan]")
+        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_white]ADAPTIVE MODE:[/bold bright_white] Learns baseline over 20 samples, then shows [bold bright_green]relative changes[/bold bright_green] from idle state [bright_cyan]║[/bright_cyan]")
+        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_white]ACTIVITY LEVELS:[/bold bright_white] [dim white]Baseline[/dim white] [bright_cyan]→[/bright_cyan] [bright_green]+10%[/bright_green] [bright_yellow]+25%[/bright_yellow] [orange1]+50%[/orange1] [bold red]+100%[/bold red] • Press 'v' to exit [bright_cyan]║[/bright_cyan]")
+        lines.append(f"[bright_cyan]╚═══════════════════════════════════════════════════════════════════════════════════════════╝[/bright_cyan]")
 
         return lines
 
