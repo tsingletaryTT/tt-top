@@ -194,9 +194,9 @@ class HardwareStarfield:
 
             # Update star based on component type and real telemetry
             if star['component_type'] == 'tensix_core':
-                # Core activity based on power consumption
-                core_activity = min(power / 100.0, 1.0)  # Normalize to 0-1
-                star['brightness'] = 0.2 + core_activity * 0.8
+                # Core activity based on power consumption (real hardware: 5-150W range)
+                core_activity = min(max(power - 5, 0) / 95.0, 1.0)  # 5W idle, 100W max active
+                star['brightness'] = 0.1 + core_activity * 0.9
 
                 # Color based on temperature
                 if temp > 80:
@@ -205,30 +205,31 @@ class HardwareStarfield:
                     star['color'] = 'orange1'
                 elif temp > 45:
                     star['color'] = 'bright_yellow'
-                elif power > 25:
+                elif power > 15:  # Lower threshold for real hardware
                     star['color'] = 'bright_green'
                 else:
                     star['color'] = 'bright_cyan'
 
-                # Twinkle speed based on current draw (activity frequency)
-                star['twinkle_speed'] = 0.05 + (current / 100.0) * 0.4
+                # Twinkle speed based on current draw (real hardware: 1-50A range)
+                normalized_current = min(max(current - 1, 0) / 49.0, 1.0)  # 1A idle, 50A max
+                star['twinkle_speed'] = 0.02 + normalized_current * 0.3
 
             elif star['component_type'] == 'memory_channel':
-                # Memory activity based on current draw
-                memory_activity = min(current / 50.0, 1.0)
-                star['brightness'] = 0.1 + memory_activity * 0.7
+                # Memory activity based on current draw (real hardware: 1-30A range)
+                memory_activity = min(max(current - 1, 0) / 29.0, 1.0)  # 1A idle, 30A max
+                star['brightness'] = 0.05 + memory_activity * 0.8
 
                 # Memory channels pulse with different colors based on utilization
-                if current > 40:
+                if current > 20:
                     star['color'] = 'bright_magenta'
-                elif current > 20:
-                    star['color'] = 'magenta'
                 elif current > 10:
+                    star['color'] = 'magenta'
+                elif current > 5:
                     star['color'] = 'bright_blue'
                 else:
                     star['color'] = 'blue'
 
-                star['twinkle_speed'] = 0.02 + memory_activity * 0.15
+                star['twinkle_speed'] = 0.01 + memory_activity * 0.15
 
             elif star['component_type'] == 'interconnect':
                 # Interconnect activity based on power difference between connected devices
@@ -239,21 +240,21 @@ class HardwareStarfield:
                         connected_power = float(connected_telem.get('power', '0.0'))
                         power_diff = abs(power - connected_power)
 
-                        # Activity increases with power difference (data flow)
-                        interconnect_activity = min(power_diff / 50.0, 1.0)
-                        star['brightness'] = 0.1 + interconnect_activity * 0.6
+                        # Activity increases with power difference (real hardware: 0-50W diff)
+                        interconnect_activity = min(power_diff / 30.0, 1.0)  # 30W max difference
+                        star['brightness'] = 0.05 + interconnect_activity * 0.7
 
                         # Color indicates traffic intensity
-                        if power_diff > 40:
+                        if power_diff > 20:
                             star['color'] = 'bright_white'
-                        elif power_diff > 20:
-                            star['color'] = 'bright_green'
                         elif power_diff > 10:
+                            star['color'] = 'bright_green'
+                        elif power_diff > 5:
                             star['color'] = 'green'
                         else:
                             star['color'] = 'dim white'
 
-                        star['twinkle_speed'] = 0.01 + interconnect_activity * 0.1
+                        star['twinkle_speed'] = 0.005 + interconnect_activity * 0.1
                 except:
                     star['brightness'] = 0.1
                     star['color'] = 'dim white'
@@ -382,9 +383,9 @@ class FlowingDataStreams:
                     power_i = float(telem_i.get('power', '0.0'))
                     power_j = float(telem_j.get('power', '0.0'))
 
-                    # Only create streams if there's significant activity
-                    if power_i > 10 or power_j > 10:
-                        stream_intensity = (power_i + power_j) / 200.0
+                    # Only create streams if there's significant activity (lowered threshold)
+                    if power_i > 5 or power_j > 5:  # Lower threshold for real hardware
+                        stream_intensity = (power_i + power_j) / 100.0  # Adjusted for real power levels
 
                         # Stream flows from higher power to lower power device
                         if power_i > power_j:
@@ -433,12 +434,12 @@ class FlowingDataStreams:
             flow_chars = ['·', '▸', '▶', '▶', '▸', '·'] if stream['direction'] > 0 else ['·', '◂', '◀', '◀', '◂', '·']
             pattern_length = len(flow_chars)
 
-            # Determine color based on intensity
-            if intensity > 0.7:
+            # Determine color based on intensity (adjusted for real hardware)
+            if intensity > 0.4:  # Lower thresholds for real hardware
                 stream_color = 'bright_white'
-            elif intensity > 0.5:
+            elif intensity > 0.25:
                 stream_color = 'bright_yellow'
-            elif intensity > 0.3:
+            elif intensity > 0.1:
                 stream_color = 'orange1'
             else:
                 stream_color = 'bright_cyan'
@@ -556,25 +557,27 @@ class HardwareResponsiveASCII(Static):
                             for i in range(total_devices))
             avg_temp = sum(float(self.backend.device_telemetrys[i].get('asic_temperature', '0'))
                           for i in range(total_devices)) / total_devices
+            total_current = sum(float(self.backend.device_telemetrys[i].get('current', '0'))
+                              for i in range(total_devices))
 
-            # Color-code system status
+            # Color-code system status (adjusted thresholds for real hardware)
             if avg_temp > 80:
                 status_color = 'bold red'
                 status_text = 'THERMAL WARNING'
             elif avg_temp > 65:
                 status_color = 'orange1'
                 status_text = 'ELEVATED TEMP'
-            elif total_power > 200:
+            elif total_power > 100:  # Lowered from 200W
                 status_color = 'bright_yellow'
                 status_text = 'HIGH POWER'
-            elif total_power > 50:
+            elif total_power > 20:  # Lowered from 50W
                 status_color = 'bright_green'
                 status_text = 'ACTIVE'
             else:
                 status_color = 'bright_cyan'
                 status_text = 'READY'
         else:
-            total_power = avg_temp = 0
+            total_power = avg_temp = total_current = 0
             status_color = 'dim white'
             status_text = 'NO DEVICES'
 
@@ -583,7 +586,8 @@ class HardwareResponsiveASCII(Static):
         pulse_char = '●' if int(elapsed_time * 2) % 2 else '○'
 
         lines.append(f"[bright_cyan]╔══════════════════════════════════════════════════════════════════════════════════════════╗[/bright_cyan]")
-        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_magenta]{pulse_char}[/bold bright_magenta] [bold bright_white]HARDWARE-RESPONSIVE VISUALIZATION[/bold bright_white] [dim white]│[/dim white] [{status_color}]{status_text}[/{status_color}] [dim white]│[/dim white] [bright_white]Devices:[/bright_white] {total_devices} [dim white]│[/dim white] [bright_white]Power:[/bright_white] [orange1]{total_power:5.1f}W[/orange1] [bright_cyan]║[/bright_cyan]")
+        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_magenta]{pulse_char}[/bold bright_magenta] [bold bright_white]HARDWARE-RESPONSIVE VISUALIZATION[/bold bright_white] [dim white]│[/dim white] [{status_color}]{status_text}[/{status_color}] [dim white]│[/dim white] [bright_white]Devices:[/bright_white] {total_devices}")
+        lines.append(f"[bright_cyan]║[/bright_cyan] [bright_white]Power:[/bright_white] [orange1]{total_power:5.1f}W[/orange1] [dim white]│[/dim white] [bright_white]Current:[/bright_white] [bright_green]{total_current:5.1f}A[/bright_green] [dim white]│[/dim white] [bright_white]Temp:[/bright_white] [bright_yellow]{avg_temp:4.1f}°C[/bright_yellow] [dim white]│[/dim white] [bright_white]Frame:[/bright_white] [bright_magenta]{self.frame_count}[/bright_magenta] [bright_cyan]║[/bright_cyan]")
         lines.append(f"[bright_cyan]╚══════════════════════════════════════════════════════════════════════════════════════════╝[/bright_cyan]")
 
         return lines
