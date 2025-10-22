@@ -610,6 +610,7 @@ class HardwareStarfield:
 
         # If workload celebration is active, render celebration mode
         if self.workload_detected:
+            print(f"🎨 DEBUG: Rendering celebration mode! Frame: {self.workload_celebration_frame}")
             return self._render_workload_celebration()
 
         # Render each star
@@ -710,6 +711,7 @@ class HardwareStarfield:
         Returns:
             List of strings with celebration visualization
         """
+        print(f"🎨 DEBUG: _render_workload_celebration called! Frame: {self.workload_celebration_frame}, Size: {self.width}x{self.height}")
         lines = []
         
         # Generate the animated ASCII art
@@ -919,6 +921,12 @@ class HardwareResponsiveASCII(Static):
     informationally dense.
     """
 
+    BINDINGS = [
+        Binding("w", "trigger_celebration", "Trigger Workload Celebration", show=True),
+        Binding("v", "exit_visualization", "Exit Visualization", show=True),
+        Binding("escape", "exit_visualization", "Exit Visualization", show=False),
+    ]
+
     def __init__(self, backend: TTSMIBackend, **kwargs):
         super().__init__(**kwargs)
         self.backend = backend
@@ -995,6 +1003,24 @@ Initialization: Starting...
             import traceback
             error_details = traceback.format_exc()
             self.update(f"[red]Animation Error: {e}[/red]\n\nDebug info:\n{error_details}")
+
+    def action_trigger_celebration(self) -> None:
+        """Trigger workload celebration manually"""
+        print("🔧 DEBUG: 'w' key pressed on HardwareResponsiveASCII widget!")
+        if hasattr(self, 'starfield') and self.starfield:
+            self.starfield.workload_detected = True
+            self.starfield.workload_detection_time = time.time()
+            self.starfield.workload_celebration_frame = 0
+            print("🎉 Workload celebration triggered from widget!")
+            print(f"🔧 DEBUG: Celebration state - detected: {self.starfield.workload_detected}")
+        else:
+            print("❌ Starfield not available for celebration trigger")
+
+    def action_exit_visualization(self) -> None:
+        """Exit visualization mode"""
+        print("🔧 DEBUG: Exit visualization called from widget")
+        # Signal parent to exit visualization mode
+        self.app.exit()
 
     def _render_complete_visualization(self) -> str:
         """Render the complete hardware-responsive visualization"""
@@ -1228,22 +1254,23 @@ class AnimatedDisplayContainer(Container):
 
     def action_trigger_workload_celebration(self) -> None:
         """Manually trigger workload celebration for testing"""
-        if self.is_visualization_mode and self.animated_display:
+        print(f"🔧 DEBUG: 'w' key pressed! Visualization mode: {self.is_visualization_mode}")
+        print(f"🔧 DEBUG: Animated display exists: {self.animated_display is not None}")
+        
+        if self.is_visualization_mode and self.animated_display and hasattr(self.animated_display, 'starfield'):
             # Manually trigger the celebration
             starfield = self.animated_display.starfield
             starfield.workload_detected = True
             starfield.workload_detection_time = time.time()
             starfield.workload_celebration_frame = 0
             print("🎉 Manual workload celebration triggered!")
-
-    def action_trigger_workload_celebration(self) -> None:
-        """Manually trigger workload celebration for testing"""
-        if self.animated_display and hasattr(self.animated_display, 'starfield'):
-            starfield = self.animated_display.starfield
-            starfield.workload_detected = True
-            starfield.workload_detection_time = time.time()
-            starfield.workload_celebration_frame = 0
-            print("🎉 Manual workload celebration triggered!")
+            print(f"🔧 DEBUG: Starfield celebration state set - detected: {starfield.workload_detected}, frame: {starfield.workload_celebration_frame}")
+        else:
+            print("❌ Cannot trigger celebration - not in visualization mode or display not available")
+            if not self.is_visualization_mode:
+                print("   Hint: Press 'v' first to enter visualization mode")
+            if not self.animated_display:
+                print("   Hint: Animated display not initialized")
 
     class VisualizationToggled:
         """Message sent when visualization is toggled"""
