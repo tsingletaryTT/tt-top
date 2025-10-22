@@ -22,6 +22,114 @@ from textual.binding import Binding
 from tt_top.tt_smi_backend import TTSMIBackend
 
 
+def generate_leet_hello_world_ascii(frame: int = 0, width: int = 80) -> List[str]:
+    """
+    Generate animated ASCII art for l33t 'HELLO WORLD!' that responds to frame count
+    
+    Args:
+        frame: Animation frame number for effects
+        width: Display width to center the art
+        
+    Returns:
+        List of strings representing the ASCII art lines
+    """
+    # L33t speak ASCII art for "HELLO WORLD!"
+    base_art = [
+        "██   ██ ███████ ██      ██       ██████      ██     ██  ██████  ██████  ██      ██████  ██ ",
+        "██   ██ ██      ██      ██      ██    ██     ██     ██ ██    ██ ██   ██ ██      ██   ██ ██ ",
+        "███████ █████   ██      ██      ██    ██     ██  █  ██ ██    ██ ██████  ██      ██   ██ ██ ",
+        "██   ██ ██      ██      ██      ██    ██     ██ ███ ██ ██    ██ ██   ██ ██      ██   ██    ",
+        "██   ██ ███████ ███████ ███████  ██████       ███ ███   ██████  ██   ██ ███████ ██████  ██ "
+    ]
+    
+    # L33t character replacements
+    leet_replacements = {
+        'A': ['4', '@', 'Λ'],
+        'E': ['3', '€', 'Ξ'],
+        'L': ['1', '|', '£'],
+        'O': ['0', '◯', 'Ø'],
+        'S': ['5', '$', 'Ş'],
+        'T': ['7', '+', '†'],
+        'I': ['!', '1', '|'],
+        'G': ['6', '&', 'Ğ']
+    }
+    
+    # Apply l33t transformations and animation effects
+    animated_art = []
+    for line_idx, line in enumerate(base_art):
+        animated_line = ""
+        for char_idx, char in enumerate(line):
+            # Add pulsing effect based on frame
+            pulse_phase = (frame * 0.1 + line_idx * 0.3 + char_idx * 0.1) % (2 * math.pi)
+            should_transform = math.sin(pulse_phase) > 0.3
+            
+            if char.upper() in leet_replacements and should_transform:
+                # Cycle through l33t variations
+                variant_idx = (frame // 10 + char_idx) % len(leet_replacements[char.upper()])
+                transformed_char = leet_replacements[char.upper()][variant_idx]
+                animated_line += transformed_char
+            else:
+                animated_line += char
+                
+        animated_art.append(animated_line)
+    
+    # Add glitch effects
+    if frame % 30 < 5:  # Glitch every 30 frames for 5 frames
+        glitch_line = random.randint(0, len(animated_art) - 1)
+        line = list(animated_art[glitch_line])
+        
+        # Add some random glitch characters
+        for _ in range(random.randint(1, 3)):
+            pos = random.randint(0, len(line) - 1)
+            glitch_chars = ['▓', '▒', '░', '█', '▀', '▄', '▌', '▐', '▖', '▗', '▘', '▙', '▚', '▛', '▜', '▝', '▞', '▟']
+            line[pos] = random.choice(glitch_chars)
+            
+        animated_art[glitch_line] = ''.join(line)
+    
+    # Center the art horizontally
+    max_line_length = max(len(line) for line in animated_art) if animated_art else 0
+    padding = max(0, (width - max_line_length) // 2)
+    
+    centered_art = []
+    for line in animated_art:
+        centered_line = ' ' * padding + line
+        centered_art.append(centered_line)
+    
+    return centered_art
+
+
+def generate_workload_celebration_effects(frame: int, width: int, height: int) -> List[str]:
+    """
+    Generate additional celebration effects around the ASCII art
+    
+    Args:
+        frame: Animation frame number
+        width: Display width
+        height: Display height
+        
+    Returns:
+        List of effect strings to overlay
+    """
+    effects = []
+    
+    # Particle explosion effect
+    particles = ['*', '✦', '✧', '✩', '★', '☆', '◆', '◇', '●', '○']
+    
+    for i in range(height):
+        effect_line = [' '] * width
+        
+        # Add random particles
+        for _ in range(random.randint(0, 3)):
+            x = random.randint(0, width - 1)
+            if random.random() < 0.3:  # 30% chance per position
+                particle = random.choice(particles)
+                effect_line[x] = particle
+        
+        effects.append(''.join(effect_line))
+    
+    return effects
+
+
 class HardwareStarfield:
     """
     A dynamic starfield where each 'star' represents a hardware component
@@ -49,6 +157,14 @@ class HardwareStarfield:
         self.baseline_current = {}
         self.baseline_temp = {}
         self.max_baseline_samples = 20  # Learn baseline over first 20 updates
+        
+        # Workload detection system
+        self.workload_detected = False
+        self.workload_detection_time = None
+        self.workload_celebration_duration = 180  # Show celebration for 180 frames (~18 seconds at 10 FPS)
+        self.workload_celebration_frame = 0
+        self.previous_activity_state = {}  # Track previous activity state per device
+        self.workload_threshold = 0.25  # 25% increase from baseline triggers workload detection
 
     def initialize_stars(self, backend: TTSMIBackend) -> None:
         """Initialize stars based on actual hardware topology
@@ -259,6 +375,55 @@ class HardwareStarfield:
 
         return (current_value - baseline_value) / baseline_value
 
+    def _detect_new_workload(self, backend: TTSMIBackend) -> bool:
+        """
+        Detect if a new workload has started based on significant activity increase from baseline
+        
+        Returns:
+            bool: True if a new workload is detected
+        """
+        if not self.baseline_established:
+            return False
+            
+        current_activity_state = {}
+        new_workload_detected = False
+        
+        for device_idx in range(len(backend.devices)):
+            if device_idx not in self.baseline_power:
+                continue
+                
+            try:
+                telem = backend.device_telemetrys[device_idx]
+                power = float(telem.get('power', '0.0'))
+                current = float(telem.get('current', '0.0'))
+                
+                # Calculate relative changes from baseline
+                power_change = self._get_relative_change(power, self.baseline_power[device_idx])
+                current_change = self._get_relative_change(current, self.baseline_current[device_idx])
+                
+                # Determine if device is now active (above workload threshold)
+                is_active = (power_change > self.workload_threshold or 
+                            current_change > self.workload_threshold)
+                
+                # Check if this is a transition from inactive to active (new workload)
+                was_active = self.previous_activity_state.get(device_idx, False)
+                
+                if is_active and not was_active:
+                    new_workload_detected = True
+                    print(f"🚀 New workload detected on device {device_idx}: "
+                          f"Power +{power_change*100:.1f}%, Current +{current_change*100:.1f}%")
+                
+                current_activity_state[device_idx] = is_active
+                
+            except Exception as e:
+                current_activity_state[device_idx] = False
+                print(f"Error checking workload for device {device_idx}: {e}")
+        
+        # Update previous state
+        self.previous_activity_state = current_activity_state
+        
+        return new_workload_detected
+
     def update_from_telemetry(self, backend: TTSMIBackend, frame_count: int) -> None:
         """Update star properties based on real hardware telemetry with adaptive baseline scaling
 
@@ -271,6 +436,21 @@ class HardwareStarfield:
         # Update baseline if not established
         if not self.baseline_established:
             self._update_baseline(backend)
+        else:
+            # Check for new workload detection
+            if self._detect_new_workload(backend):
+                self.workload_detected = True
+                self.workload_detection_time = time.time()
+                self.workload_celebration_frame = 0
+                print("🎉 WORKLOAD CELEBRATION ACTIVATED!")
+        
+        # Update celebration frame counter if celebrating
+        if self.workload_detected:
+            self.workload_celebration_frame += 1
+            if self.workload_celebration_frame >= self.workload_celebration_duration:
+                self.workload_detected = False
+                self.workload_celebration_frame = 0
+                print("✨ Workload celebration ended")
 
         for star in self.stars:
             device_idx = star['device_idx']
@@ -428,6 +608,10 @@ class HardwareStarfield:
         field = [[' ' for _ in range(self.width)] for _ in range(self.height)]
         color_field = [['dim white' for _ in range(self.width)] for _ in range(self.height)]
 
+        # If workload celebration is active, render celebration mode
+        if self.workload_detected:
+            return self._render_workload_celebration()
+
         # Render each star
         for star in self.stars:
             x, y = star['x'], star['y']
@@ -518,6 +702,100 @@ class HardwareStarfield:
             lines.append(''.join(line_parts))
 
         return lines
+
+    def _render_workload_celebration(self) -> List[str]:
+        """
+        Render the celebration mode with l33t HELLO WORLD ASCII art and effects
+        
+        Returns:
+            List of strings with celebration visualization
+        """
+        lines = []
+        
+        # Generate the animated ASCII art
+        ascii_art = generate_leet_hello_world_ascii(self.workload_celebration_frame, self.width)
+        
+        # Calculate vertical position to center the ASCII art
+        ascii_height = len(ascii_art)
+        vertical_padding = max(0, (self.height - ascii_height) // 2)
+        
+        # Add padding lines at top
+        for _ in range(vertical_padding):
+            lines.append(' ' * self.width)
+        
+        # Add the ASCII art with colors and effects
+        for line_idx, art_line in enumerate(ascii_art):
+            # Apply rainbow colors that cycle through the celebration
+            color_cycle = ['bright_red', 'bright_yellow', 'bright_green', 'bright_cyan', 
+                          'bright_blue', 'bright_magenta', 'bright_white']
+            
+            # Calculate color based on frame and line position for rainbow wave effect
+            color_offset = (self.workload_celebration_frame // 3 + line_idx) % len(color_cycle)
+            line_color = color_cycle[color_offset]
+            
+            # Add pulsing effect
+            pulse_intensity = abs(math.sin(self.workload_celebration_frame * 0.2))
+            if pulse_intensity > 0.7:
+                line_color = f'bold {line_color}'
+            
+            # Create the colored line
+            if art_line.strip():  # Only color non-empty lines
+                colored_line = f'[{line_color}]{art_line}[/{line_color}]'
+            else:
+                colored_line = art_line
+                
+            lines.append(colored_line)
+        
+        # Add padding lines at bottom
+        remaining_lines = self.height - len(lines)
+        for _ in range(remaining_lines):
+            lines.append(' ' * self.width)
+            
+        # Add particle effects overlay
+        if self.workload_celebration_frame % 5 == 0:  # Update particles every 5 frames
+            lines = self._add_celebration_particles(lines)
+        
+        return lines
+    
+    def _add_celebration_particles(self, base_lines: List[str]) -> List[str]:
+        """
+        Add animated particle effects over the celebration display
+        
+        Args:
+            base_lines: Base lines to add particles to
+            
+        Returns:
+            Modified lines with particle effects
+        """
+        enhanced_lines = []
+        
+        for line_idx, line in enumerate(base_lines):
+            line_chars = list(line) if isinstance(line, str) else [' '] * self.width
+            
+            # Add random celebration particles
+            particles = ['✦', '✧', '✩', '★', '☆', '◆', '◇', '●', '○', '▲', '▼', '♦', '♠', '♣', '♥']
+            particle_colors = ['bright_yellow', 'bright_red', 'bright_green', 'bright_blue', 
+                              'bright_magenta', 'bright_cyan', 'bright_white']
+            
+            # More particles at the beginning and end of celebration
+            celebration_progress = self.workload_celebration_frame / self.workload_celebration_duration
+            if celebration_progress < 0.3 or celebration_progress > 0.7:
+                particle_density = 0.15  # Higher density during intro and outro
+            else:
+                particle_density = 0.05  # Lower density during main display
+            
+            for char_idx in range(len(line_chars)):
+                if random.random() < particle_density:
+                    particle = random.choice(particles)
+                    particle_color = random.choice(particle_colors)
+                    
+                    # Only add particle if position is empty (space)
+                    if char_idx < len(line_chars) and line_chars[char_idx] == ' ':
+                        line_chars[char_idx] = f'[{particle_color}]{particle}[/{particle_color}]'
+            
+            enhanced_lines.append(''.join(line_chars))
+        
+        return enhanced_lines
 
 
 class FlowingDataStreams:
@@ -839,7 +1117,13 @@ Press 'v' to exit visualization mode
 
         # Show baseline status and relative changes
         if hasattr(self, 'starfield') and hasattr(self.starfield, 'baseline_established'):
-            if self.starfield.baseline_established:
+            # Check if in celebration mode
+            if hasattr(self.starfield, 'workload_detected') and self.starfield.workload_detected:
+                celebration_progress = (self.starfield.workload_celebration_frame / 
+                                      self.starfield.workload_celebration_duration * 100)
+                baseline_status = f"[bold bright_green]🚀 WORKLOAD CELEBRATION MODE![/bold bright_green]"
+                change_info = f"[bright_white]Progress:[/bright_white] [bright_magenta]{celebration_progress:.1f}%[/bright_magenta] [dim white]│[/dim white] [bright_yellow]Frame:[/bright_yellow] [bright_cyan]{self.starfield.workload_celebration_frame}[/bright_cyan]"
+            elif self.starfield.baseline_established:
                 baseline_status = "[bright_green]BASELINE ESTABLISHED[/bright_green]"
                 # Calculate relative changes from baseline
                 if total_devices > 0:
@@ -864,7 +1148,7 @@ Press 'v' to exit visualization mode
 
         lines.append(f"[bright_cyan]╔═══════════════════════════════════════════════════════════════════════════════════════════╗[/bright_cyan]")
         lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_magenta]{pulse_char}[/bold bright_magenta] [bold bright_white]ADAPTIVE HARDWARE VISUALIZATION[/bold bright_white] [dim white]│[/dim white] [{status_color}]{status_text}[/{status_color}] [dim white]│[/dim white] [bright_white]Devices:[/bright_white] {total_devices} [bright_cyan]║[/bright_cyan]")
-        lines.append(f"[bright_cyan]║[/bright_cyan] {baseline_status} [dim white]│[/dim white] {change_info} [bright_cyan]║[/bright_cyan]")
+        lines.append(f"[bright_cyan]║[/bright_cyan] {baseline_status} [dim white]│[/dim white] {change_info}")
         lines.append(f"[bright_cyan]║[/bright_cyan] [bright_white]Absolute:[/bright_white] [orange1]{total_power:5.1f}W[/orange1] [bright_green]{total_current:5.1f}A[/bright_green] [bright_yellow]{avg_temp:4.1f}°C[/bright_yellow] [dim white]│[/dim white] [bright_white]Frame:[/bright_white] [bright_magenta]{self.frame_count}[/bright_magenta] [bright_cyan]║[/bright_cyan]")
         lines.append(f"[bright_cyan]╚═══════════════════════════════════════════════════════════════════════════════════════════╝[/bright_cyan]")
 
@@ -876,8 +1160,8 @@ Press 'v' to exit visualization mode
 
         lines.append(f"[bright_cyan]╔═══════════════════════════════════════════════════════════════════════════════════════════╗[/bright_cyan]")
         lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_white]COMPONENTS:[/bold bright_white] [bright_cyan]●◉○∘·[/bright_cyan] Tensix Cores [dim white]│[/dim white] [bright_magenta]█▓▒░·[/bright_magenta] Memory Ch [dim white]│[/dim white] [bright_blue]◆[/bright_blue] L1 [bright_yellow]◇[/bright_yellow] L2 [bright_red]♦[/bright_red] DDR [dim white]│[/dim white] [bright_green]✦✧✩[/bright_green] Links [bright_cyan]║[/bright_cyan]")
-        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_white]ADAPTIVE MODE:[/bold bright_white] Learns baseline over 20 samples, then shows [bold bright_green]relative changes[/bold bright_green] from idle state [bright_cyan]║[/bright_cyan]")
-        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_white]ACTIVITY LEVELS:[/bold bright_white] [dim white]Baseline[/dim white] [bright_cyan]→[/bright_cyan] [bright_green]+10%[/bright_green] [bright_yellow]+25%[/bright_yellow] [orange1]+50%[/orange1] [bold red]+100%[/bold red] • Press 'v' to exit [bright_cyan]║[/bright_cyan]")
+        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_white]WORKLOAD DETECTION:[/bold bright_white] Shows [bold bright_magenta]🚀 l33t H3LL0 W0RLD![/bold bright_magenta] when activity +{int(hasattr(self, 'starfield') and getattr(self.starfield, 'workload_threshold', 0.25) * 100)}% above baseline")
+        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_white]CONTROLS:[/bold bright_white] Press 'v' to exit [dim white]│[/dim white] Press 'w' to test celebration [dim white]│[/dim white] [bright_green]+10%[/bright_green] [bright_yellow]+25%[/bright_yellow] [orange1]+50%[/orange1] triggers celebration [bright_cyan]║[/bright_cyan]")
         lines.append(f"[bright_cyan]╚═══════════════════════════════════════════════════════════════════════════════════════════╝[/bright_cyan]")
 
         return lines
@@ -891,6 +1175,7 @@ class AnimatedDisplayContainer(Container):
     BINDINGS = [
         Binding("v", "toggle_visualization", "Toggle Visualization", show=True),
         Binding("escape", "exit_visualization", "Exit Visualization", show=False),
+        Binding("w", "trigger_workload_celebration", "Test Workload Celebration", show=True),
     ]
 
     def __init__(self, backend: TTSMIBackend, **kwargs):
@@ -940,6 +1225,25 @@ class AnimatedDisplayContainer(Container):
 
         # Signal parent to restore normal view
         self.post_message_no_wait(self.VisualizationToggled(False))
+
+    def action_trigger_workload_celebration(self) -> None:
+        """Manually trigger workload celebration for testing"""
+        if self.is_visualization_mode and self.animated_display:
+            # Manually trigger the celebration
+            starfield = self.animated_display.starfield
+            starfield.workload_detected = True
+            starfield.workload_detection_time = time.time()
+            starfield.workload_celebration_frame = 0
+            print("🎉 Manual workload celebration triggered!")
+
+    def action_trigger_workload_celebration(self) -> None:
+        """Manually trigger workload celebration for testing"""
+        if self.animated_display and hasattr(self.animated_display, 'starfield'):
+            starfield = self.animated_display.starfield
+            starfield.workload_detected = True
+            starfield.workload_detection_time = time.time()
+            starfield.workload_celebration_frame = 0
+            print("🎉 Manual workload celebration triggered!")
 
     class VisualizationToggled:
         """Message sent when visualization is toggled"""
