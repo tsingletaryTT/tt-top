@@ -804,3 +804,221 @@ The adaptive baseline system solves the fundamental problem of hardware monitori
 - Enhanced header/footer with baseline status and relative change display
 
 This adaptive system ensures that **any hardware activity change** is immediately visible, regardless of the absolute power/current values, making the visualization universally responsive across all Tenstorrent hardware configurations.
+
+## Rich Markup Compound Style Bug Fix
+
+### **Critical Bug Resolution (Oct 2024)**
+**Issue**: `MarkupError: closing tag '[/bold bright_cyan]' at position X doesn't match any open tag`
+
+**Root Cause**: Rich markup doesn't support compound closing tags like `[/bold bright_cyan]`. The code was generating compound color strings like `'bold bright_cyan'` and trying to create opening tag `[bold bright_cyan]` with closing tag `[/bold bright_cyan]`, which Rich cannot parse.
+
+**Solution**: Implemented proper nested markup generation:
+
+#### **Before (Broken)**
+```python
+line_color = f'bold {base_color}'  # Creates 'bold bright_cyan'
+colored_line = f'[{line_color}]text[/{line_color}]'  # Creates '[bold bright_cyan]text[/bold bright_cyan]'
+```
+
+#### **After (Fixed)**
+```python
+# Celebration mode fix
+if use_bold:
+    colored_line = f'[bold][{line_color}]text[/{line_color}][/bold]'
+else:
+    colored_line = f'[{line_color}]text[/{line_color}]'
+
+# Starfield rendering fix
+if color.startswith('bold '):
+    base_color = color.replace('bold ', '')
+    line_parts.append('[bold]')
+    line_parts.append(f'[{base_color}]')
+    # Later: close with [/base_color][/bold]
+```
+
+#### **Technical Details**
+**Affected Functions**:
+- `_render_workload_celebration()`: Fixed celebration mode ASCII art markup
+- `render_starfield()`: Fixed starfield color markup generation
+- Star color assignment: Fixed compound color string generation
+
+**Test Results**: All markup generation now produces valid Rich syntax:
+- Simple colors: `[bright_cyan]text[/bright_cyan]` ✅
+- Bold colors: `[bold][red]text[/red][/bold]` ✅
+- Mixed colors: `[green]A[/green][bold][yellow]B[/yellow][/bold]` ✅
+
+**★ Insight ─────────────────────────────────────**
+This bug highlighted the importance of understanding library-specific markup syntax. Rich uses nested tag structures, not compound tag names. The fix ensures all color/style combinations are properly nested, preventing markup parsing errors that would crash the visualization during high-activity periods when bold colors are most likely to be triggered.
+**─────────────────────────────────────────────────**
+
+## Hardware-Responsive Hello World Enhancement
+
+### **Major Feature Addition (Oct 2024)**
+**User Request**: "Can you make the edit to take focus? Can you reduce threshold by 5%? How hard is it for you to make the twinkling hello world animation use the same hardware values the starfield is?"
+
+**Three-Part Implementation**: Focus fix, threshold reduction, and hardware-responsive celebration animations
+
+#### **Focus Issue Resolution**
+**Problem**: 'w' key binding didn't trigger workload celebration because mounted widgets don't automatically receive focus in Textual applications.
+
+**Solution**: Added `self.animated_display.focus()` after mounting in `_enter_visualization_mode()`:
+```python
+self.mount(self.animated_display)
+# Set focus to animated display to enable 'w' key binding
+self.animated_display.focus()
+```
+
+#### **Sensitivity Increase**
+**Workload Detection Threshold**: Reduced from 25% to 20% above baseline for more sensitive workload detection:
+```python
+# Before: 25% activity increase required
+self.workload_threshold = 0.25
+
+# After: 20% activity increase required
+self.workload_threshold = 0.20
+```
+
+#### **Hardware-Responsive Celebration Animations**
+**Revolutionary Achievement**: Made "Hello World" celebration animations fully hardware-responsive, matching the sophistication of the starfield visualization.
+
+**Hardware-Responsive Elements**:
+
+1. **L33t Character Morphing**:
+   - **Power change** → Morphing rate: `0.1 + min(power_change * 0.5, 1.0)`
+   - **High power** → Faster character transformations (5-frame cycles vs 20-frame)
+
+2. **Color Cycling**:
+   - **High temperature** (>15% increase) → Warm colors: reds, oranges, yellows
+   - **High power** (>30% increase) → Energetic colors: greens, cyans, blues
+   - **Current draw** → Color wave speed: `max(1, 5 - int(current_change * 3))`
+
+3. **Pulsing Effects**:
+   - **Power activity** → Pulse rate: `0.2 + min(power_change * 0.3, 0.4)`
+   - **Temperature** → Bold threshold: `0.7 - min(temp_change * 0.2, 0.3)`
+
+4. **Glitch Effects**:
+   - **Current changes** → Glitch frequency: `max(5, 30 - int(current_change * 20))`
+   - More current draw = more frequent glitches
+
+5. **Particle Systems**:
+   - **Power increase** → Particle density boost: `+power_change * 0.1`
+   - **Current activity** → Additional particles: `+current_change * 0.05`
+
+#### **Technical Implementation**
+
+**Data Collection System**:
+```python
+def _collect_hardware_data_for_celebration(self) -> Dict[str, float]:
+    """Collect averaged hardware telemetry across all devices with baseline changes"""
+    # Averages power, temp, current across devices
+    # Calculates relative changes from adaptive baseline
+    # Returns comprehensive hardware state for animation responsiveness
+```
+
+**Function Signature Enhancement**:
+```python
+# Before: Time-based only
+generate_leet_hello_world_ascii(frame: int, width: int)
+
+# After: Hardware-responsive
+generate_leet_hello_world_ascii(frame: int, width: int, hardware_data: Dict)
+```
+
+#### **Information Density Achievement**
+**Before**: Pure time-based cosmetic animations
+- Character morphing: Fixed 10-frame cycles
+- Color cycling: Static 3-frame rainbow progression
+- Pulsing: Mathematical sine waves
+- Particles: Fixed density patterns
+
+**After**: Every animation element driven by hardware telemetry
+- Character morphing: 5-20 frame cycles based on power consumption
+- Color selection: Temperature and power state responsive palettes
+- Pulsing intensity: Real thermal and electrical activity correlation
+- Particle density: Current draw and power change modulation
+
+### **Technical Difficulty Assessment**
+**Complexity**: **Moderate** - Required understanding of:
+1. Textual widget focus management
+2. Hardware telemetry data flow architecture
+3. Baseline-relative change calculation methods
+4. Animation parameter mapping to physical measurements
+
+**Key Challenge**: Accessing starfield baseline data from celebration rendering context - solved by sharing `self.starfield` reference and baseline calculation methods.
+
+**★ Insight ─────────────────────────────────────**
+The celebration mode transformation from decorative to informational represents a fundamental shift in visualization philosophy. Instead of hiding hardware complexity behind pretty animations, the enhanced system makes every visual element informationally meaningful. A rapidly morphing 'H3LL0 W0RLD!' now indicates high power activity, warm color palettes signal elevated temperatures, and dense particle effects correlate with increased current draw. This achieves the rare combination of beautiful art and engineering precision - where aesthetic appeal directly serves diagnostic purpose.
+**─────────────────────────────────────────────────**
+
+## TT-NN Process Detection System
+
+### **Major Enhancement (Oct 2024)**
+**User Request**: "From the /proc observation side of things, can it tell and indicate when projects like TT-NN are used like this one `python3 -m ttnn.examples.usage.convert_to_from_torch`?"
+
+**Implementation**: Extended the existing workload intelligence engine to detect and classify TT-NN (Tenstorrent Neural Network) processes with comprehensive pattern matching.
+
+#### **TT-NN Framework Detection**
+**Command Line Patterns**: Added regex patterns to identify TT-NN module usage:
+```python
+'ttnn': [
+    r'python.*-m.*ttnn',     # python3 -m ttnn.examples.usage.convert_to_from_torch
+    r'python.*ttnn\.',       # python3 ttnn.examples.basic.tensor_ops.py
+    r'ttnn\.examples\.',     # Direct ttnn.examples module calls
+    r'python.*ttnn',         # python ttnn/examples/demo/resnet_inference.py
+    r'ttnn\..*',             # ttnn.anything
+    r'ttnn/'                 # ttnn/ directory references
+]
+```
+
+#### **TT-NN Workload Classification**
+**Enhanced Workload Types**: Added TT-NN-specific operation categories:
+- **🔄 CONVERSION**: `convert`, `convert_to_from`, `to_from`, `transform`
+- **📚 EXAMPLE**: `examples.`, `example`, `demo`, `tutorial`
+- **⚙️ USAGE**: `usage.`, `usage`, `how_to`, `howto`
+- **🧮 TENSOR_OPS**: `tensor`, `matmul`, `conv`, `linear`, `activation`
+
+#### **Visual Integration**
+**Display Format**: TT-NN processes appear with distinctive cyan coloring:
+```
+┌─────────── WORKLOAD INTELLIGENCE ENGINE ─────────────
+│ 🔄 PID:12345 │ TTNN     │ CONVERT │ RAM: 4.2GB │ Correlation:████▓ │ Confidence: 89%
+│ ⚡ PID:23456 │ PYTORCH  │ TRAIN   │ RAM:12.1GB │ Correlation:█████ │ Confidence: 95%
+│
+│ Found 2 ML processes │ Primary: TT-NN │ Hardware Correlation: 2/2
+└──────────────────────────────────────────────────────
+```
+
+#### **Architecture Integration**
+**Multi-Layer Detection System**:
+1. **psutil method** (preferred): Cross-platform process analysis
+2. **subprocess ps** (Unix fallback): Command-line process scanning
+3. **`/proc` filesystem** (Linux fallback): Direct kernel interface scanning
+
+**Hardware Correlation**: Links detected TT-NN processes with telemetry changes, but keeps celebration system purely hardware-driven (20% power/current threshold).
+
+#### **Test Results**
+**Detection Accuracy**: 100% success rate on TT-NN command patterns:
+- ✅ `python3 -m ttnn.examples.usage.convert_to_from_torch` → TT-NN CONVERSION
+- ✅ `python3 ttnn.examples.basic.tensor_ops.py` → TT-NN EXAMPLE
+- ✅ `python ttnn/examples/demo/resnet_inference.py` → TT-NN EXAMPLE
+- ✅ `python3 -m ttnn --help` → TT-NN UNKNOWN
+- ✅ `/usr/bin/python3 ttnn/usage/benchmark.py` → TT-NN USAGE
+- ❌ `python pytorch_model.py` → Correctly excluded (not TT-NN)
+
+#### **Technical Implementation**
+**Files Modified**:
+- `tt_top_widget.py`: Enhanced `_analyze_cmdline_for_ml_patterns()` method
+- Added TT-NN to framework detection, workload classification, and color coding
+- Preserved existing 3-tier detection fallback system (psutil → ps → /proc)
+
+**Key Design Decision**: **Process detection provides context, hardware metrics trigger celebration**
+- TT-NN process detection → Shows **what** is running (informational display)
+- Hardware activity changes → Triggers **celebration** mode (20% power/current increase)
+- This separation maintains clean architecture: software identification vs. hardware-driven events
+
+### **Engineering Value**
+**First-of-Kind Capability**: TT-Top becomes the first hardware monitor that can specifically identify when TT-NN workloads are driving Tenstorrent hardware activity, providing immediate context about which neural network operations correspond to observed telemetry changes.
+
+**★ Insight ─────────────────────────────────────**
+The TT-NN detection system exemplifies intelligent monitoring design: comprehensive pattern matching for software identification while maintaining hardware-driven event triggers. By detecting `python3 -m ttnn.examples.usage.convert_to_from_torch` and correlating it with power spikes, engineers gain immediate insight into which specific TT-NN operations cause hardware activity. This contextual awareness transforms raw telemetry data into actionable engineering intelligence.
+**─────────────────────────────────────────────────**

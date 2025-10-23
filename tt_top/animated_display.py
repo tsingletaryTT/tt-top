@@ -22,14 +22,16 @@ from textual.binding import Binding
 from tt_top.tt_smi_backend import TTSMIBackend
 
 
-def generate_leet_hello_world_ascii(frame: int = 0, width: int = 80) -> List[str]:
+def generate_leet_hello_world_ascii(frame: int = 0, width: int = 80, hardware_data: Dict = None) -> List[str]:
     """
-    Generate animated ASCII art for l33t 'HELLO WORLD!' that responds to frame count
-    
+    Generate animated ASCII art for l33t 'HELLO WORLD!' that responds to hardware activity
+
     Args:
-        frame: Animation frame number for effects
+        frame: Animation frame number for base effects
         width: Display width to center the art
-        
+        hardware_data: Dict with hardware telemetry for responsive effects
+                      Expected keys: 'power', 'temp', 'current', 'power_change', 'temp_change'
+
     Returns:
         List of strings representing the ASCII art lines
     """
@@ -54,27 +56,51 @@ def generate_leet_hello_world_ascii(frame: int = 0, width: int = 80) -> List[str
         'G': ['6', '&', 'Ğ']
     }
     
-    # Apply l33t transformations and animation effects
+    # Extract hardware values for animation responsiveness
+    if hardware_data:
+        power_change = hardware_data.get('power_change', 0.0)
+        temp_change = hardware_data.get('temp_change', 0.0)
+        current_change = hardware_data.get('current_change', 0.0)
+        power = hardware_data.get('power', 50.0)
+        temp = hardware_data.get('temp', 50.0)
+
+        # Hardware-responsive animation factors
+        morph_rate = 0.1 + min(power_change * 0.5, 1.0)  # More power = faster morphing
+        pulse_intensity = 0.3 + min(temp_change * 0.4, 0.5)  # Higher temp = more pulsing
+        glitch_frequency = max(5, 30 - int(current_change * 20))  # More current = more glitches
+    else:
+        # Fallback to time-based animation when no hardware data available
+        morph_rate = 0.1
+        pulse_intensity = 0.3
+        glitch_frequency = 30
+
+    # Apply l33t transformations and hardware-responsive animation effects
     animated_art = []
     for line_idx, line in enumerate(base_art):
         animated_line = ""
         for char_idx, char in enumerate(line):
-            # Add pulsing effect based on frame
-            pulse_phase = (frame * 0.1 + line_idx * 0.3 + char_idx * 0.1) % (2 * math.pi)
-            should_transform = math.sin(pulse_phase) > 0.3
-            
+            # Hardware-responsive pulsing effect
+            pulse_phase = (frame * morph_rate + line_idx * 0.3 + char_idx * 0.1) % (2 * math.pi)
+            should_transform = math.sin(pulse_phase) > pulse_intensity
+
             if char.upper() in leet_replacements and should_transform:
-                # Cycle through l33t variations
-                variant_idx = (frame // 10 + char_idx) % len(leet_replacements[char.upper()])
+                # Hardware-responsive l33t variation cycling
+                if hardware_data:
+                    # Use power level to influence transformation variety
+                    variant_speed = max(5, 20 - int(power_change * 10))
+                    variant_idx = (frame // variant_speed + char_idx) % len(leet_replacements[char.upper()])
+                else:
+                    variant_idx = (frame // 10 + char_idx) % len(leet_replacements[char.upper()])
+
                 transformed_char = leet_replacements[char.upper()][variant_idx]
                 animated_line += transformed_char
             else:
                 animated_line += char
-                
+
         animated_art.append(animated_line)
     
-    # Add glitch effects
-    if frame % 30 < 5:  # Glitch every 30 frames for 5 frames
+    # Add hardware-responsive glitch effects
+    if frame % glitch_frequency < 5:  # Hardware determines glitch frequency
         glitch_line = random.randint(0, len(animated_art) - 1)
         line = list(animated_art[glitch_line])
         
@@ -164,7 +190,7 @@ class HardwareStarfield:
         self.workload_celebration_duration = 180  # Show celebration for 180 frames (~18 seconds at 10 FPS)
         self.workload_celebration_frame = 0
         self.previous_activity_state = {}  # Track previous activity state per device
-        self.workload_threshold = 0.25  # 25% increase from baseline triggers workload detection
+        self.workload_threshold = 0.20  # 20% increase from baseline triggers workload detection
 
     def initialize_stars(self, backend: TTSMIBackend) -> None:
         """Initialize stars based on actual hardware topology
@@ -734,8 +760,11 @@ class HardwareStarfield:
         print(f"🎨 DEBUG: _render_workload_celebration called! Frame: {self.workload_celebration_frame}, Size: {self.width}x{self.height}")
         lines = []
         
-        # Generate the animated ASCII art
-        ascii_art = generate_leet_hello_world_ascii(self.workload_celebration_frame, self.width)
+        # Collect hardware data for responsive animations
+        hardware_data = self._collect_hardware_data_for_celebration()
+
+        # Generate the hardware-responsive animated ASCII art
+        ascii_art = generate_leet_hello_world_ascii(self.workload_celebration_frame, self.width, hardware_data)
         
         # Calculate vertical position to center the ASCII art
         ascii_height = len(ascii_art)
@@ -747,17 +776,39 @@ class HardwareStarfield:
         
         # Add the ASCII art with colors and effects
         for line_idx, art_line in enumerate(ascii_art):
-            # Apply rainbow colors that cycle through the celebration
-            color_cycle = ['bright_red', 'bright_yellow', 'bright_green', 'bright_cyan', 
-                          'bright_blue', 'bright_magenta', 'bright_white']
-            
-            # Calculate color based on frame and line position for rainbow wave effect
-            color_offset = (self.workload_celebration_frame // 3 + line_idx) % len(color_cycle)
+            # Hardware-responsive color cycling and pulsing
+            if hardware_data and hardware_data.get('temp_change', 0) > 0.15:
+                # High temperature - use warmer colors
+                color_cycle = ['bright_red', 'orange1', 'bright_yellow', 'yellow',
+                              'bright_magenta', 'magenta', 'bright_white']
+            elif hardware_data and hardware_data.get('power_change', 0) > 0.3:
+                # High power - use energetic colors
+                color_cycle = ['bright_green', 'bright_cyan', 'bright_blue', 'bright_magenta',
+                              'bright_yellow', 'bright_white', 'bright_red']
+            else:
+                # Normal/baseline - standard rainbow
+                color_cycle = ['bright_red', 'bright_yellow', 'bright_green', 'bright_cyan',
+                              'bright_blue', 'bright_magenta', 'bright_white']
+
+            # Hardware-responsive color wave speed
+            if hardware_data:
+                color_speed = max(1, 5 - int(hardware_data.get('current_change', 0) * 3))
+            else:
+                color_speed = 3
+
+            color_offset = (self.workload_celebration_frame // color_speed + line_idx) % len(color_cycle)
             line_color = color_cycle[color_offset]
-            
-            # Add pulsing effect
-            pulse_intensity = abs(math.sin(self.workload_celebration_frame * 0.2))
-            use_bold = pulse_intensity > 0.7
+
+            # Hardware-responsive pulsing effect
+            if hardware_data:
+                pulse_rate = 0.2 + min(hardware_data.get('power_change', 0) * 0.3, 0.4)
+                pulse_threshold = 0.7 - min(hardware_data.get('temp_change', 0) * 0.2, 0.3)
+            else:
+                pulse_rate = 0.2
+                pulse_threshold = 0.7
+
+            pulse_intensity = abs(math.sin(self.workload_celebration_frame * pulse_rate))
+            use_bold = pulse_intensity > pulse_threshold
 
             # Create the colored line with proper Rich markup nesting
             if art_line.strip():  # Only color non-empty lines
@@ -780,7 +831,67 @@ class HardwareStarfield:
             lines = self._add_celebration_particles(lines)
         
         return lines
-    
+
+    def _collect_hardware_data_for_celebration(self) -> Dict[str, float]:
+        """Collect hardware telemetry data for responsive celebration animations
+
+        Returns:
+            Dict with averaged hardware values and relative changes from baseline
+        """
+        if not hasattr(self, 'starfield') or not self.starfield or not self.starfield.baseline_established:
+            # No hardware data available or baseline not established
+            return {}
+
+        try:
+            total_power = total_temp = total_current = 0.0
+            total_power_change = total_temp_change = total_current_change = 0.0
+            device_count = 0
+
+            # Average hardware values across all devices
+            for device_idx in range(len(self.backend.devices)):
+                if device_idx not in self.starfield.baseline_power:
+                    continue
+
+                try:
+                    telem = self.backend.device_telemetrys[device_idx]
+                    power = float(telem.get('power', '0.0'))
+                    temp = float(telem.get('asic_temperature', '0.0'))
+                    current = float(telem.get('current', '0.0'))
+
+                    # Calculate relative changes from baseline
+                    power_change = self.starfield._get_relative_change(power, self.starfield.baseline_power[device_idx])
+                    temp_change = self.starfield._get_relative_change(temp, self.starfield.baseline_temp[device_idx])
+                    current_change = self.starfield._get_relative_change(current, self.starfield.baseline_current[device_idx])
+
+                    total_power += power
+                    total_temp += temp
+                    total_current += current
+                    total_power_change += power_change
+                    total_temp_change += temp_change
+                    total_current_change += current_change
+                    device_count += 1
+
+                except (ValueError, KeyError):
+                    continue
+
+            if device_count == 0:
+                return {}
+
+            # Return averaged values for celebration animation
+            return {
+                'power': total_power / device_count,
+                'temp': total_temp / device_count,
+                'current': total_current / device_count,
+                'power_change': total_power_change / device_count,
+                'temp_change': total_temp_change / device_count,
+                'current_change': total_current_change / device_count,
+                'device_count': device_count
+            }
+
+        except Exception as e:
+            print(f"🔧 DEBUG: Error collecting hardware data for celebration: {e}")
+            return {}
+
     def _add_celebration_particles(self, base_lines: List[str]) -> List[str]:
         """
         Add animated particle effects over the celebration display
@@ -801,12 +912,24 @@ class HardwareStarfield:
             particle_colors = ['bright_yellow', 'bright_red', 'bright_green', 'bright_blue', 
                               'bright_magenta', 'bright_cyan', 'bright_white']
             
-            # More particles at the beginning and end of celebration
+            # Hardware-responsive particle density
+            # Collect hardware data for particles
+            hardware_data = self._collect_hardware_data_for_celebration()
+
+            # Base density from celebration progress
             celebration_progress = self.workload_celebration_frame / self.workload_celebration_duration
             if celebration_progress < 0.3 or celebration_progress > 0.7:
-                particle_density = 0.15  # Higher density during intro and outro
+                base_density = 0.15  # Higher density during intro and outro
             else:
-                particle_density = 0.05  # Lower density during main display
+                base_density = 0.05  # Lower density during main display
+
+            # Hardware modulation of particle density
+            if hardware_data:
+                power_boost = min(hardware_data.get('power_change', 0) * 0.1, 0.1)
+                current_boost = min(hardware_data.get('current_change', 0) * 0.05, 0.05)
+                particle_density = base_density + power_boost + current_boost
+            else:
+                particle_density = base_density
             
             for char_idx in range(len(line_chars)):
                 if random.random() < particle_density:
@@ -1208,7 +1331,7 @@ Press 'v' to exit visualization mode
 
         lines.append(f"[bright_cyan]╔═══════════════════════════════════════════════════════════════════════════════════════════╗[/bright_cyan]")
         lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_white]COMPONENTS:[/bold bright_white] [bright_cyan]●◉○∘·[/bright_cyan] Tensix Cores [dim white]│[/dim white] [bright_magenta]█▓▒░·[/bright_magenta] Memory Ch [dim white]│[/dim white] [bright_blue]◆[/bright_blue] L1 [bright_yellow]◇[/bright_yellow] L2 [bright_red]♦[/bright_red] DDR [dim white]│[/dim white] [bright_green]✦✧✩[/bright_green] Links [bright_cyan]║[/bright_cyan]")
-        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_white]WORKLOAD DETECTION:[/bold bright_white] Shows [bold bright_magenta]🚀 l33t H3LL0 W0RLD![/bold bright_magenta] when activity +{int(hasattr(self, 'starfield') and getattr(self.starfield, 'workload_threshold', 0.25) * 100)}% above baseline")
+        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_white]WORKLOAD DETECTION:[/bold bright_white] Says [bold bright_magenta]🚀 hello[/bold bright_magenta] when activity +{int(hasattr(self, 'starfield') and getattr(self.starfield, 'workload_threshold', 0.20) * 100)}% above baseline")
         lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_white]CONTROLS:[/bold bright_white] Press 'v' to exit [dim white]│[/dim white] Press 'w' to test celebration [dim white]│[/dim white] [bright_green]+10%[/bright_green] [bright_yellow]+25%[/bright_yellow] [orange1]+50%[/orange1] triggers celebration [bright_cyan]║[/bright_cyan]")
         lines.append(f"[bright_cyan]╚═══════════════════════════════════════════════════════════════════════════════════════════╝[/bright_cyan]")
 
