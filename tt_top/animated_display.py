@@ -1199,6 +1199,11 @@ Initialization: Starting...
                 max_celebration_lines = min(8, len(celebration_lines))
                 lines.extend(celebration_lines[:max_celebration_lines])
 
+                # Add simple multi-color "Hello!" text below celebration
+                hello_text = self._create_simple_hello_text(self.starfield.workload_celebration_frame)
+                lines.append("")  # Spacing
+                lines.append(hello_text)
+
             # Add footer with legend
             footer = self._create_visualization_footer()
             lines.extend(footer)
@@ -1347,6 +1352,35 @@ Press 'v' to exit visualization mode
         lines.append(f"[bright_cyan]╚═══════════════════════════════════════════════════════════════════════════════════════════╝[/bright_cyan]")
 
         return lines
+
+    def _create_simple_hello_text(self, frame: int) -> str:
+        """Create simple multi-color 'Hello!' text for celebration
+
+        Args:
+            frame: Current celebration frame for color cycling
+
+        Returns:
+            Formatted hello text with hardware-responsive colors
+        """
+        # Multi-color palette that cycles through the celebration
+        colors = ['bright_red', 'bright_yellow', 'bright_green', 'bright_cyan',
+                  'bright_blue', 'bright_magenta', 'bright_white']
+
+        # Create "Hello!" with each letter in a different color
+        hello_letters = ['H', 'e', 'l', 'l', 'o', '!']
+        colored_letters = []
+
+        for i, letter in enumerate(hello_letters):
+            # Cycle through colors based on frame and letter position
+            color_index = (frame // 5 + i) % len(colors)
+            color = colors[color_index]
+            colored_letters.append(f'[{color}]{letter}[/{color}]')
+
+        # Center the text
+        hello_text = ''.join(colored_letters)
+        centered_text = hello_text.center(80)  # Assume 80-character width
+
+        return centered_text
 
 
 class AnimatedDisplayContainer(Container):
