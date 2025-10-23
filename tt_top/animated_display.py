@@ -190,7 +190,13 @@ class HardwareStarfield:
         self.workload_celebration_duration = 40  # Show celebration for 40 frames (~4 seconds at 10 FPS)
         self.workload_celebration_frame = 0
         self.previous_activity_state = {}  # Track previous activity state per device
-        self.workload_threshold = 0.20  # 20% increase from baseline triggers workload detection
+        self.workload_threshold = 0.20  # 20% increase from baseline triggers celebration animation
+
+        # Multi-stage celebration system
+        self.hello_threshold = 0.25  # 25% increase from baseline triggers Hello text (initial)
+        self.hello_shown_once = False  # Track if Hello has been displayed in this session
+        self.hello_shown_count = 0  # Count how many times Hello has been shown
+        self.show_hello_text = False  # Flag to show Hello text during current celebration
 
     def initialize_stars(self, backend: TTSMIBackend) -> None:
         """Initialize stars based on actual hardware topology
@@ -450,6 +456,53 @@ class HardwareStarfield:
         
         return new_workload_detected
 
+    def _should_show_hello(self, backend: TTSMIBackend) -> bool:
+        """
+        Check if Hello text should be displayed based on higher activity threshold
+
+        Returns:
+            bool: True if activity exceeds Hello threshold
+        """
+        if not self.baseline_established:
+            return False
+
+        # Check if any device exceeds the Hello threshold
+        for device_idx in range(len(backend.devices)):
+            if device_idx not in self.baseline_power:
+                continue
+
+            try:
+                telem = backend.device_telemetrys[device_idx]
+                power = float(telem.get('power', '0.0'))
+                current = float(telem.get('current', '0.0'))
+
+                # Calculate relative changes from baseline
+                power_change = self._get_relative_change(power, self.baseline_power[device_idx])
+                current_change = self._get_relative_change(current, self.baseline_current[device_idx])
+
+                # Check if activity exceeds Hello threshold
+                if (power_change > self.hello_threshold or current_change > self.hello_threshold):
+                    # If this is the first time showing Hello, mark it and increase threshold for next time
+                    if not self.hello_shown_once:
+                        self.hello_shown_once = True
+                        self.hello_shown_count += 1
+                        # Increase threshold for next time (make it harder to get)
+                        self.hello_threshold = 0.35  # 35% for subsequent showings
+                        print(f"🎉 HELLO! threshold reached for first time! Next threshold: {self.hello_threshold*100:.0f}%")
+                    elif self.hello_shown_count < 3:  # Allow up to 3 Hello displays per session
+                        self.hello_shown_count += 1
+                        # Make it progressively harder
+                        self.hello_threshold = min(0.45, self.hello_threshold + 0.05)  # Cap at 45%
+                        print(f"🎉 HELLO! threshold reached again! Count: {self.hello_shown_count}, Next threshold: {self.hello_threshold*100:.0f}%")
+
+                    return True
+
+            except Exception as e:
+                print(f"Error checking Hello threshold for device {device_idx}: {e}")
+                continue
+
+        return False
+
     def update_from_telemetry(self, backend: TTSMIBackend, frame_count: int) -> None:
         """Update star properties based on real hardware telemetry with adaptive baseline scaling
 
@@ -463,12 +516,20 @@ class HardwareStarfield:
         if not self.baseline_established:
             self._update_baseline(backend)
         else:
-            # Check for new workload detection
+            # Check for new workload detection (celebration animation threshold)
             if self._detect_new_workload(backend):
                 self.workload_detected = True
                 self.workload_detection_time = time.time()
                 self.workload_celebration_frame = 0
                 print("🎉 WORKLOAD CELEBRATION ACTIVATED!")
+
+                # Check if we should also show Hello text (higher threshold)
+                if self._should_show_hello(backend):
+                    self.show_hello_text = True
+                    print("🎊 HELLO! text also activated!")
+                else:
+                    self.show_hello_text = False
+                    print("📊 Celebration only - Hello threshold not reached")
         
         # Update celebration frame counter if celebrating
         if self.workload_detected:
@@ -476,6 +537,7 @@ class HardwareStarfield:
             if self.workload_celebration_frame >= self.workload_celebration_duration:
                 self.workload_detected = False
                 self.workload_celebration_frame = 0
+                self.show_hello_text = False  # Reset Hello flag
                 print("✨ Workload celebration ended")
 
         for star in self.stars:
@@ -1150,11 +1212,18 @@ Initialization: Starting...
         """Trigger workload celebration manually"""
         print("🔧 DEBUG: 'w' key pressed on HardwareResponsiveASCII widget!")
         if hasattr(self, 'starfield') and self.starfield:
+            # Manually trigger the celebration
             self.starfield.workload_detected = True
             self.starfield.workload_detection_time = time.time()
             self.starfield.workload_celebration_frame = 0
+
+            # For manual testing, also trigger Hello text (simulates high threshold being reached)
+            self.starfield.show_hello_text = True
+
             print("🎉 Workload celebration triggered from widget!")
+            print("🎊 Hello text also activated for manual testing!")
             print(f"🔧 DEBUG: Celebration state - detected: {self.starfield.workload_detected}")
+            print(f"🔧 DEBUG: Hello text flag: {self.starfield.show_hello_text}")
         else:
             print("❌ Starfield not available for celebration trigger")
 
@@ -1199,12 +1268,16 @@ Initialization: Starting...
                 max_celebration_lines = min(8, len(celebration_lines))
                 lines.extend(celebration_lines[:max_celebration_lines])
 
-                # Add simple multi-color "Hello!" text below celebration
-                hello_text = self._create_simple_hello_text(self.starfield.workload_celebration_frame)
-                lines.append("")  # Spacing
-                # Split multi-line hello text and add each line
-                hello_lines = hello_text.split('\n')
-                lines.extend(hello_lines)
+                # Add simple multi-color "Hello!" text below celebration ONLY if Hello threshold reached
+                if self.starfield.show_hello_text:
+                    print(f"🎊 DEBUG: Adding Hello text - threshold reached!")
+                    hello_text = self._create_simple_hello_text(self.starfield.workload_celebration_frame)
+                    lines.append("")  # Spacing
+                    # Split multi-line hello text and add each line
+                    hello_lines = hello_text.split('\n')
+                    lines.extend(hello_lines)
+                else:
+                    print(f"📊 DEBUG: Celebration active but Hello threshold not reached")
 
             # Add footer with legend
             footer = self._create_visualization_footer()
