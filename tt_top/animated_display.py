@@ -1202,7 +1202,9 @@ Initialization: Starting...
                 # Add simple multi-color "Hello!" text below celebration
                 hello_text = self._create_simple_hello_text(self.starfield.workload_celebration_frame)
                 lines.append("")  # Spacing
-                lines.append(hello_text)
+                # Split multi-line hello text and add each line
+                hello_lines = hello_text.split('\n')
+                lines.extend(hello_lines)
 
             # Add footer with legend
             footer = self._create_visualization_footer()
@@ -1354,33 +1356,66 @@ Press 'v' to exit visualization mode
         return lines
 
     def _create_simple_hello_text(self, frame: int) -> str:
-        """Create simple multi-color 'Hello!' text for celebration
+        """Create large multi-color 'Hello!' text using ASCII art for celebration
 
         Args:
             frame: Current celebration frame for color cycling
 
         Returns:
-            Formatted hello text with hardware-responsive colors
+            Multi-line formatted hello text with hardware-responsive colors
         """
         # Multi-color palette that cycles through the celebration
         colors = ['bright_red', 'bright_yellow', 'bright_green', 'bright_cyan',
                   'bright_blue', 'bright_magenta', 'bright_white']
 
-        # Create "Hello!" with each letter in a different color
+        # ASCII art for "Hello!" using block characters
+        # Each letter is 3 lines tall, 4 characters wide (except ! which is 2 wide)
+        ascii_letters = {
+            'H': ['█   █', '█████', '█   █'],
+            'e': ['█████', '███  ', '█████'],
+            'l': ['█    ', '█    ', '█████'],
+            'l': ['█    ', '█    ', '█████'],  # Same as 'l'
+            'o': [' ███ ', '█   █', ' ███ '],
+            '!': ['██', '██', '██']
+        }
+
+        # Create the 3-line ASCII art
         hello_letters = ['H', 'e', 'l', 'l', 'o', '!']
-        colored_letters = []
+        line1_parts = []
+        line2_parts = []
+        line3_parts = []
 
         for i, letter in enumerate(hello_letters):
             # Cycle through colors based on frame and letter position
             color_index = (frame // 5 + i) % len(colors)
             color = colors[color_index]
-            colored_letters.append(f'[{color}]{letter}[/{color}]')
 
-        # Center the text
-        hello_text = ''.join(colored_letters)
-        centered_text = hello_text.center(80)  # Assume 80-character width
+            # Get ASCII art for this letter
+            art_lines = ascii_letters[letter]
 
-        return centered_text
+            # Add colored version of each line
+            line1_parts.append(f'[{color}]{art_lines[0]}[/{color}]')
+            line2_parts.append(f'[{color}]{art_lines[1]}[/{color}]')
+            line3_parts.append(f'[{color}]{art_lines[2]}[/{color}]')
+
+            # Add spacing between letters (except after !)
+            if letter != '!':
+                line1_parts.append(' ')
+                line2_parts.append(' ')
+                line3_parts.append(' ')
+
+        # Join each line
+        line1 = ''.join(line1_parts)
+        line2 = ''.join(line2_parts)
+        line3 = ''.join(line3_parts)
+
+        # Center all lines (assume 80-character width)
+        centered_line1 = line1.center(100)  # Give more space for Rich markup
+        centered_line2 = line2.center(100)
+        centered_line3 = line3.center(100)
+
+        # Return as multi-line string
+        return f"{centered_line1}\n{centered_line2}\n{centered_line3}"
 
 
 class AnimatedDisplayContainer(Container):

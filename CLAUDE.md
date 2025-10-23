@@ -1159,3 +1159,31 @@ def _create_simple_hello_text(self, frame: int) -> str:
 - **Hardware correlation**: Can observe both the trigger (hardware changes) and confirmation (hello text) simultaneously
 
 **Perfect Balance**: Combines the detailed starfield monitoring with simple, clear workload detection feedback - addressing the user's concern about missing hello world text while maintaining the improved unobtrusive architecture.
+
+### **Large ASCII Art Enhancement (Oct 2024)**
+**User Request**: "can we center the "Hello!" text and make the font size bigger with this framework?"
+
+**Implementation**: Enhanced the simple hello text to use large ASCII art block letters for better visibility.
+
+#### **ASCII Art Block Letters**
+**3-Line Block Design**: Each letter uses block characters (█) in a 3-line format:
+```
+Frame 0:
+█   █ █████ █     █      ███  ██
+█████ ███   █     █     █   █ ██
+█   █ █████ █████ █████  ███  ██
+
+Frame 5 (color cycling):
+█   █ █████ █     █      ███  ██
+█████ ███   █     █     █   █ ██
+█   █ █████ █████ █████  ███  ██
+```
+
+#### **Enhanced Visual Impact**
+**Size Comparison**:
+- **Before**: Single-line `Hello!` (1 line tall)
+- **After**: Block letters `Hello!` (3 lines tall, ~40 characters wide)
+
+**Improved Readability**: Much larger and more visible during the 4-second celebration period, making workload detection events impossible to miss while maintaining the unobtrusive below-starfield positioning.
+
+**Technical Implementation**: Uses multi-line ASCII art with proper centering and Rich markup color cycling across each letter individually.
