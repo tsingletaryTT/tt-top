@@ -187,7 +187,7 @@ class HardwareStarfield:
         # Workload detection system
         self.workload_detected = False
         self.workload_detection_time = None
-        self.workload_celebration_duration = 180  # Show celebration for 180 frames (~18 seconds at 10 FPS)
+        self.workload_celebration_duration = 40  # Show celebration for 40 frames (~4 seconds at 10 FPS)
         self.workload_celebration_frame = 0
         self.previous_activity_state = {}  # Track previous activity state per device
         self.workload_threshold = 0.20  # 20% increase from baseline triggers workload detection
@@ -636,10 +636,7 @@ class HardwareStarfield:
         field = [[' ' for _ in range(self.width)] for _ in range(self.height)]
         color_field = [['dim white' for _ in range(self.width)] for _ in range(self.height)]
 
-        # If workload celebration is active, render celebration mode
-        if self.workload_detected:
-            print(f"🎨 DEBUG: Rendering celebration mode! Frame: {self.workload_celebration_frame}")
-            return self._render_workload_celebration()
+        # Always render starfield (celebration will be added below if active)
 
         # Render each star
         for star in self.stars:
@@ -1187,6 +1184,20 @@ Initialization: Starting...
             enhanced_lines = self.data_streams.render_streams(starfield_lines)
 
             lines.extend(enhanced_lines)
+
+            # If workload celebration is active, add it below the starfield (unobtrusive)
+            if hasattr(self, 'starfield') and self.starfield and self.starfield.workload_detected:
+                print(f"🎨 DEBUG: Adding celebration below starfield! Frame: {self.starfield.workload_celebration_frame}")
+
+                # Add a separator line before celebration
+                lines.append("")
+                lines.append("[dim white]" + "─" * self.starfield.width + "[/dim white]")
+
+                # Get celebration content from starfield (but limit height to keep it unobtrusive)
+                celebration_lines = self.starfield._render_workload_celebration()
+                # Limit celebration to bottom portion of screen (max 8 lines)
+                max_celebration_lines = min(8, len(celebration_lines))
+                lines.extend(celebration_lines[:max_celebration_lines])
 
             # Add footer with legend
             footer = self._create_visualization_footer()

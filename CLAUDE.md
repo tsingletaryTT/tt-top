@@ -1022,3 +1022,85 @@ The celebration mode transformation from decorative to informational represents 
 **★ Insight ─────────────────────────────────────**
 The TT-NN detection system exemplifies intelligent monitoring design: comprehensive pattern matching for software identification while maintaining hardware-driven event triggers. By detecting `python3 -m ttnn.examples.usage.convert_to_from_torch` and correlating it with power spikes, engineers gain immediate insight into which specific TT-NN operations cause hardware activity. This contextual awareness transforms raw telemetry data into actionable engineering intelligence.
 **─────────────────────────────────────────────────**
+
+## Celebration Duration Optimization
+
+### **User-Requested Adjustment (Oct 2024)**
+**User Request**: "shorten the duration of the celebration to 3 or 4 seconds"
+
+**Implementation**: Reduced workload celebration duration from 18 seconds to 4 seconds for more practical monitoring:
+
+```python
+# Before: 18 second celebration
+self.workload_celebration_duration = 180  # 180 frames at 10 FPS
+
+# After: 4 second celebration
+self.workload_celebration_duration = 40   # 40 frames at 10 FPS
+```
+
+**Rationale**: Shorter celebrations provide immediate feedback without extended interruption of normal monitoring view, making the tool more practical for continuous hardware observation while preserving the visual impact of workload detection events.
+
+## Unobtrusive Celebration Positioning
+
+### **User-Requested Enhancement (Oct 2024)**
+**User Request**: "Move the hello world below the starfield so it's unobtrusive"
+
+**Implementation**: Completely restructured celebration rendering architecture to show both starfield and celebration simultaneously:
+
+#### **Before: Intrusive Full-Screen Takeover**
+```
+┌─ Celebration Active ─┐
+│                      │
+│   H3LL0 W0RLD!       │  ← Replaces entire starfield
+│   (ASCII art fills   │
+│    entire display)   │
+│                      │
+└──────────────────────┘
+```
+
+#### **After: Unobtrusive Below-Starfield Display**
+```
+┌─ Starfield (Always Visible) ─┐
+│ ●◉○ ★✦  Memory planets       │  ← Main visualization continues
+│ ✧○● Data streams ◇◆          │
+│ ●✦○ Hardware topology        │
+├─────────────────────────────────│  ← Separator line
+│ H3LL0 W0RLD! (limited to 8   │  ← Celebration below (max 8 lines)
+│ lines maximum)                │
+└─────────────────────────────────┘
+```
+
+#### **Architectural Changes**
+
+**Rendering Flow Restructure**:
+1. **Starfield rendering**: Always executes, never replaced
+2. **Data streams overlay**: Applied over starfield as normal
+3. **Celebration check**: If active, append below with separator
+4. **Height limitation**: Celebration capped at 8 lines maximum
+5. **Footer**: Legend and controls remain at bottom
+
+**Code Architecture**:
+```python
+# OLD: Celebration replaced entire starfield
+if self.workload_detected:
+    return self._render_workload_celebration()  # Early return, no starfield
+
+# NEW: Celebration added below starfield
+lines.extend(starfield_content)  # Always render starfield
+if self.starfield.workload_detected:
+    lines.append("─" * width)  # Separator
+    celebration = self.starfield._render_workload_celebration()
+    lines.extend(celebration[:8])  # Append below, max 8 lines
+```
+
+#### **User Experience Impact**
+
+**Continuous Context**: Engineers never lose sight of hardware topology, memory activity, or interconnect patterns during celebrations
+
+**Reduced Disruption**: 4-second celebrations now occupy only bottom portion of display instead of full screen takeover
+
+**Information Density**: Both real-time hardware visualization AND workload detection feedback simultaneously visible
+
+**★ Insight ─────────────────────────────────────**
+This architectural change represents a shift from event-driven UI replacement to event-augmented continuous monitoring. Instead of celebrations interrupting the monitoring experience, they enhance it by providing additional context while preserving the primary visualization. Engineers can now observe the exact hardware activity patterns that triggered the celebration, creating better correlation between software events and hardware responses.
+**─────────────────────────────────────────────────**
