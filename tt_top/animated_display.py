@@ -550,7 +550,9 @@ class HardwareStarfield:
 
                     # Planet colors intensify with activity
                     if activity > 0.3:
-                        star['color'] = f'bold {base_color.split("_")[1]}'
+                        # Use proper compound color name instead of string concatenation
+                        color_part = base_color.split("_")[1] if "_" in base_color else base_color
+                        star['color'] = f'bold {color_part}'
                     elif activity > 0.1:
                         star['color'] = base_color
                     else:
@@ -687,10 +689,23 @@ class HardwareStarfield:
 
             for char, color in zip(char_row, color_row):
                 if color != current_color:
+                    # Close previous color/bold tags
                     if current_color is not None:
-                        line_parts.append(f'[/{current_color}]')
+                        if current_color.startswith('bold '):
+                            base_color = current_color.replace('bold ', '')
+                            line_parts.append(f'[/{base_color}]')
+                            line_parts.append('[/bold]')
+                        else:
+                            line_parts.append(f'[/{current_color}]')
+
+                    # Open new color/bold tags
                     if char != ' ':  # Don't add color markup for spaces
-                        line_parts.append(f'[{color}]')
+                        if color.startswith('bold '):
+                            base_color = color.replace('bold ', '')
+                            line_parts.append('[bold]')
+                            line_parts.append(f'[{base_color}]')
+                        else:
+                            line_parts.append(f'[{color}]')
                         current_color = color
                     else:
                         current_color = None
@@ -698,7 +713,12 @@ class HardwareStarfield:
 
             # Close final color tag if needed
             if current_color is not None:
-                line_parts.append(f'[/{current_color}]')
+                if current_color.startswith('bold '):
+                    base_color = current_color.replace('bold ', '')
+                    line_parts.append(f'[/{base_color}]')
+                    line_parts.append('[/bold]')
+                else:
+                    line_parts.append(f'[/{current_color}]')
 
             lines.append(''.join(line_parts))
 
@@ -737,12 +757,14 @@ class HardwareStarfield:
             
             # Add pulsing effect
             pulse_intensity = abs(math.sin(self.workload_celebration_frame * 0.2))
-            if pulse_intensity > 0.7:
-                line_color = f'bold {line_color}'
-            
-            # Create the colored line
+            use_bold = pulse_intensity > 0.7
+
+            # Create the colored line with proper Rich markup nesting
             if art_line.strip():  # Only color non-empty lines
-                colored_line = f'[{line_color}]{art_line}[/{line_color}]'
+                if use_bold:
+                    colored_line = f'[bold][{line_color}]{art_line}[/{line_color}][/bold]'
+                else:
+                    colored_line = f'[{line_color}]{art_line}[/{line_color}]'
             else:
                 colored_line = art_line
                 
