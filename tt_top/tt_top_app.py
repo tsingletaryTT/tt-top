@@ -170,6 +170,9 @@ class TTTopApp(App[None]):
         )
         self.mount(self.animated_display)
 
+        # Set focus to animated display to enable 'w' key binding
+        self.animated_display.focus()
+
         # Update subtitle to show mode
         self.sub_title = "Hardware-Responsive Animated Visualization (Press 'v' to exit)"
 

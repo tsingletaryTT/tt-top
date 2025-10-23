@@ -22,6 +22,140 @@ from textual.binding import Binding
 from tt_top.tt_smi_backend import TTSMIBackend
 
 
+def generate_leet_hello_world_ascii(frame: int = 0, width: int = 80, hardware_data: Dict = None) -> List[str]:
+    """
+    Generate animated ASCII art for l33t 'HELLO WORLD!' that responds to hardware activity
+
+    Args:
+        frame: Animation frame number for base effects
+        width: Display width to center the art
+        hardware_data: Dict with hardware telemetry for responsive effects
+                      Expected keys: 'power', 'temp', 'current', 'power_change', 'temp_change'
+
+    Returns:
+        List of strings representing the ASCII art lines
+    """
+    # L33t speak ASCII art for "HELLO WORLD!"
+    base_art = [
+        "██   ██ ███████ ██      ██       ██████      ██     ██  ██████  ██████  ██      ██████  ██ ",
+        "██   ██ ██      ██      ██      ██    ██     ██     ██ ██    ██ ██   ██ ██      ██   ██ ██ ",
+        "███████ █████   ██      ██      ██    ██     ██  █  ██ ██    ██ ██████  ██      ██   ██ ██ ",
+        "██   ██ ██      ██      ██      ██    ██     ██ ███ ██ ██    ██ ██   ██ ██      ██   ██    ",
+        "██   ██ ███████ ███████ ███████  ██████       ███ ███   ██████  ██   ██ ███████ ██████  ██ "
+    ]
+    
+    # L33t character replacements
+    leet_replacements = {
+        'A': ['4', '@', 'Λ'],
+        'E': ['3', '€', 'Ξ'],
+        'L': ['1', '|', '£'],
+        'O': ['0', '◯', 'Ø'],
+        'S': ['5', '$', 'Ş'],
+        'T': ['7', '+', '†'],
+        'I': ['!', '1', '|'],
+        'G': ['6', '&', 'Ğ']
+    }
+    
+    # Extract hardware values for animation responsiveness
+    if hardware_data:
+        power_change = hardware_data.get('power_change', 0.0)
+        temp_change = hardware_data.get('temp_change', 0.0)
+        current_change = hardware_data.get('current_change', 0.0)
+        power = hardware_data.get('power', 50.0)
+        temp = hardware_data.get('temp', 50.0)
+
+        # Hardware-responsive animation factors
+        morph_rate = 0.1 + min(power_change * 0.5, 1.0)  # More power = faster morphing
+        pulse_intensity = 0.3 + min(temp_change * 0.4, 0.5)  # Higher temp = more pulsing
+        glitch_frequency = max(5, 30 - int(current_change * 20))  # More current = more glitches
+    else:
+        # Fallback to time-based animation when no hardware data available
+        morph_rate = 0.1
+        pulse_intensity = 0.3
+        glitch_frequency = 30
+
+    # Apply l33t transformations and hardware-responsive animation effects
+    animated_art = []
+    for line_idx, line in enumerate(base_art):
+        animated_line = ""
+        for char_idx, char in enumerate(line):
+            # Hardware-responsive pulsing effect
+            pulse_phase = (frame * morph_rate + line_idx * 0.3 + char_idx * 0.1) % (2 * math.pi)
+            should_transform = math.sin(pulse_phase) > pulse_intensity
+
+            if char.upper() in leet_replacements and should_transform:
+                # Hardware-responsive l33t variation cycling
+                if hardware_data:
+                    # Use power level to influence transformation variety
+                    variant_speed = max(5, 20 - int(power_change * 10))
+                    variant_idx = (frame // variant_speed + char_idx) % len(leet_replacements[char.upper()])
+                else:
+                    variant_idx = (frame // 10 + char_idx) % len(leet_replacements[char.upper()])
+
+                transformed_char = leet_replacements[char.upper()][variant_idx]
+                animated_line += transformed_char
+            else:
+                animated_line += char
+
+        animated_art.append(animated_line)
+    
+    # Add hardware-responsive glitch effects
+    if frame % glitch_frequency < 5:  # Hardware determines glitch frequency
+        glitch_line = random.randint(0, len(animated_art) - 1)
+        line = list(animated_art[glitch_line])
+        
+        # Add some random glitch characters
+        for _ in range(random.randint(1, 3)):
+            pos = random.randint(0, len(line) - 1)
+            glitch_chars = ['▓', '▒', '░', '█', '▀', '▄', '▌', '▐', '▖', '▗', '▘', '▙', '▚', '▛', '▜', '▝', '▞', '▟']
+            line[pos] = random.choice(glitch_chars)
+            
+        animated_art[glitch_line] = ''.join(line)
+    
+    # Center the art horizontally
+    max_line_length = max(len(line) for line in animated_art) if animated_art else 0
+    padding = max(0, (width - max_line_length) // 2)
+    
+    centered_art = []
+    for line in animated_art:
+        centered_line = ' ' * padding + line
+        centered_art.append(centered_line)
+    
+    return centered_art
+
+
+def generate_workload_celebration_effects(frame: int, width: int, height: int) -> List[str]:
+    """
+    Generate additional celebration effects around the ASCII art
+    
+    Args:
+        frame: Animation frame number
+        width: Display width
+        height: Display height
+        
+    Returns:
+        List of effect strings to overlay
+    """
+    effects = []
+    
+    # Particle explosion effect
+    particles = ['*', '✦', '✧', '✩', '★', '☆', '◆', '◇', '●', '○']
+    
+    for i in range(height):
+        effect_line = [' '] * width
+        
+        # Add random particles
+        for _ in range(random.randint(0, 3)):
+            x = random.randint(0, width - 1)
+            if random.random() < 0.3:  # 30% chance per position
+                particle = random.choice(particles)
+                effect_line[x] = particle
+        
+        effects.append(''.join(effect_line))
+    
+    return effects
+
+
 class HardwareStarfield:
     """
     A dynamic starfield where each 'star' represents a hardware component
@@ -49,6 +183,20 @@ class HardwareStarfield:
         self.baseline_current = {}
         self.baseline_temp = {}
         self.max_baseline_samples = 20  # Learn baseline over first 20 updates
+        
+        # Workload detection system
+        self.workload_detected = False
+        self.workload_detection_time = None
+        self.workload_celebration_duration = 40  # Show celebration for 40 frames (~4 seconds at 10 FPS)
+        self.workload_celebration_frame = 0
+        self.previous_activity_state = {}  # Track previous activity state per device
+        self.workload_threshold = 0.20  # 20% increase from baseline triggers celebration animation
+
+        # Multi-stage celebration system
+        self.hello_threshold = 0.25  # 25% increase from baseline triggers Hello text (initial)
+        self.hello_shown_once = False  # Track if Hello has been displayed in this session
+        self.hello_shown_count = 0  # Count how many times Hello has been shown
+        self.show_hello_text = False  # Flag to show Hello text during current celebration
 
     def initialize_stars(self, backend: TTSMIBackend) -> None:
         """Initialize stars based on actual hardware topology
@@ -259,6 +407,102 @@ class HardwareStarfield:
 
         return (current_value - baseline_value) / baseline_value
 
+    def _detect_new_workload(self, backend: TTSMIBackend) -> bool:
+        """
+        Detect if a new workload has started based on significant activity increase from baseline
+        
+        Returns:
+            bool: True if a new workload is detected
+        """
+        if not self.baseline_established:
+            return False
+            
+        current_activity_state = {}
+        new_workload_detected = False
+        
+        for device_idx in range(len(backend.devices)):
+            if device_idx not in self.baseline_power:
+                continue
+                
+            try:
+                telem = backend.device_telemetrys[device_idx]
+                power = float(telem.get('power', '0.0'))
+                current = float(telem.get('current', '0.0'))
+                
+                # Calculate relative changes from baseline
+                power_change = self._get_relative_change(power, self.baseline_power[device_idx])
+                current_change = self._get_relative_change(current, self.baseline_current[device_idx])
+                
+                # Determine if device is now active (above workload threshold)
+                is_active = (power_change > self.workload_threshold or 
+                            current_change > self.workload_threshold)
+                
+                # Check if this is a transition from inactive to active (new workload)
+                was_active = self.previous_activity_state.get(device_idx, False)
+                
+                if is_active and not was_active:
+                    new_workload_detected = True
+                    print(f"🚀 New workload detected on device {device_idx}: "
+                          f"Power +{power_change*100:.1f}%, Current +{current_change*100:.1f}%")
+                
+                current_activity_state[device_idx] = is_active
+                
+            except Exception as e:
+                current_activity_state[device_idx] = False
+                print(f"Error checking workload for device {device_idx}: {e}")
+        
+        # Update previous state
+        self.previous_activity_state = current_activity_state
+        
+        return new_workload_detected
+
+    def _should_show_hello(self, backend: TTSMIBackend) -> bool:
+        """
+        Check if Hello text should be displayed based on higher activity threshold
+
+        Returns:
+            bool: True if activity exceeds Hello threshold
+        """
+        if not self.baseline_established:
+            return False
+
+        # Check if any device exceeds the Hello threshold
+        for device_idx in range(len(backend.devices)):
+            if device_idx not in self.baseline_power:
+                continue
+
+            try:
+                telem = backend.device_telemetrys[device_idx]
+                power = float(telem.get('power', '0.0'))
+                current = float(telem.get('current', '0.0'))
+
+                # Calculate relative changes from baseline
+                power_change = self._get_relative_change(power, self.baseline_power[device_idx])
+                current_change = self._get_relative_change(current, self.baseline_current[device_idx])
+
+                # Check if activity exceeds Hello threshold
+                if (power_change > self.hello_threshold or current_change > self.hello_threshold):
+                    # If this is the first time showing Hello, mark it and increase threshold for next time
+                    if not self.hello_shown_once:
+                        self.hello_shown_once = True
+                        self.hello_shown_count += 1
+                        # Increase threshold for next time (make it harder to get)
+                        self.hello_threshold = 0.35  # 35% for subsequent showings
+                        print(f"🎉 HELLO! threshold reached for first time! Next threshold: {self.hello_threshold*100:.0f}%")
+                    elif self.hello_shown_count < 3:  # Allow up to 3 Hello displays per session
+                        self.hello_shown_count += 1
+                        # Make it progressively harder
+                        self.hello_threshold = min(0.45, self.hello_threshold + 0.05)  # Cap at 45%
+                        print(f"🎉 HELLO! threshold reached again! Count: {self.hello_shown_count}, Next threshold: {self.hello_threshold*100:.0f}%")
+
+                    return True
+
+            except Exception as e:
+                print(f"Error checking Hello threshold for device {device_idx}: {e}")
+                continue
+
+        return False
+
     def update_from_telemetry(self, backend: TTSMIBackend, frame_count: int) -> None:
         """Update star properties based on real hardware telemetry with adaptive baseline scaling
 
@@ -271,6 +515,30 @@ class HardwareStarfield:
         # Update baseline if not established
         if not self.baseline_established:
             self._update_baseline(backend)
+        else:
+            # Check for new workload detection (celebration animation threshold)
+            if self._detect_new_workload(backend):
+                self.workload_detected = True
+                self.workload_detection_time = time.time()
+                self.workload_celebration_frame = 0
+                print("🎉 WORKLOAD CELEBRATION ACTIVATED!")
+
+                # Check if we should also show Hello text (higher threshold)
+                if self._should_show_hello(backend):
+                    self.show_hello_text = True
+                    print("🎊 HELLO! text also activated!")
+                else:
+                    self.show_hello_text = False
+                    print("📊 Celebration only - Hello threshold not reached")
+        
+        # Update celebration frame counter if celebrating
+        if self.workload_detected:
+            self.workload_celebration_frame += 1
+            if self.workload_celebration_frame >= self.workload_celebration_duration:
+                self.workload_detected = False
+                self.workload_celebration_frame = 0
+                self.show_hello_text = False  # Reset Hello flag
+                print("✨ Workload celebration ended")
 
         for star in self.stars:
             device_idx = star['device_idx']
@@ -370,7 +638,9 @@ class HardwareStarfield:
 
                     # Planet colors intensify with activity
                     if activity > 0.3:
-                        star['color'] = f'bold {base_color.split("_")[1]}'
+                        # Use proper compound color name instead of string concatenation
+                        color_part = base_color.split("_")[1] if "_" in base_color else base_color
+                        star['color'] = f'bold {color_part}'
                     elif activity > 0.1:
                         star['color'] = base_color
                     else:
@@ -427,6 +697,8 @@ class HardwareStarfield:
         # Initialize blank field
         field = [[' ' for _ in range(self.width)] for _ in range(self.height)]
         color_field = [['dim white' for _ in range(self.width)] for _ in range(self.height)]
+
+        # Always render starfield (celebration will be added below if active)
 
         # Render each star
         for star in self.stars:
@@ -502,10 +774,23 @@ class HardwareStarfield:
 
             for char, color in zip(char_row, color_row):
                 if color != current_color:
+                    # Close previous color/bold tags
                     if current_color is not None:
-                        line_parts.append(f'[/{current_color}]')
+                        if current_color.startswith('bold '):
+                            base_color = current_color.replace('bold ', '')
+                            line_parts.append(f'[/{base_color}]')
+                            line_parts.append('[/bold]')
+                        else:
+                            line_parts.append(f'[/{current_color}]')
+
+                    # Open new color/bold tags
                     if char != ' ':  # Don't add color markup for spaces
-                        line_parts.append(f'[{color}]')
+                        if color.startswith('bold '):
+                            base_color = color.replace('bold ', '')
+                            line_parts.append('[bold]')
+                            line_parts.append(f'[{base_color}]')
+                        else:
+                            line_parts.append(f'[{color}]')
                         current_color = color
                     else:
                         current_color = None
@@ -513,11 +798,210 @@ class HardwareStarfield:
 
             # Close final color tag if needed
             if current_color is not None:
-                line_parts.append(f'[/{current_color}]')
+                if current_color.startswith('bold '):
+                    base_color = current_color.replace('bold ', '')
+                    line_parts.append(f'[/{base_color}]')
+                    line_parts.append('[/bold]')
+                else:
+                    line_parts.append(f'[/{current_color}]')
 
             lines.append(''.join(line_parts))
 
         return lines
+
+    def _render_workload_celebration(self) -> List[str]:
+        """
+        Render the celebration mode with l33t HELLO WORLD ASCII art and effects
+        
+        Returns:
+            List of strings with celebration visualization
+        """
+        print(f"🎨 DEBUG: _render_workload_celebration called! Frame: {self.workload_celebration_frame}, Size: {self.width}x{self.height}")
+        lines = []
+        
+        # Collect hardware data for responsive animations
+        hardware_data = self._collect_hardware_data_for_celebration()
+
+        # Generate the hardware-responsive animated ASCII art
+        ascii_art = generate_leet_hello_world_ascii(self.workload_celebration_frame, self.width, hardware_data)
+        
+        # Calculate vertical position to center the ASCII art
+        ascii_height = len(ascii_art)
+        vertical_padding = max(0, (self.height - ascii_height) // 2)
+        
+        # Add padding lines at top
+        for _ in range(vertical_padding):
+            lines.append(' ' * self.width)
+        
+        # Add the ASCII art with colors and effects
+        for line_idx, art_line in enumerate(ascii_art):
+            # Hardware-responsive color cycling and pulsing
+            if hardware_data and hardware_data.get('temp_change', 0) > 0.15:
+                # High temperature - use warmer colors
+                color_cycle = ['bright_red', 'orange1', 'bright_yellow', 'yellow',
+                              'bright_magenta', 'magenta', 'bright_white']
+            elif hardware_data and hardware_data.get('power_change', 0) > 0.3:
+                # High power - use energetic colors
+                color_cycle = ['bright_green', 'bright_cyan', 'bright_blue', 'bright_magenta',
+                              'bright_yellow', 'bright_white', 'bright_red']
+            else:
+                # Normal/baseline - standard rainbow
+                color_cycle = ['bright_red', 'bright_yellow', 'bright_green', 'bright_cyan',
+                              'bright_blue', 'bright_magenta', 'bright_white']
+
+            # Hardware-responsive color wave speed
+            if hardware_data:
+                color_speed = max(1, 5 - int(hardware_data.get('current_change', 0) * 3))
+            else:
+                color_speed = 3
+
+            color_offset = (self.workload_celebration_frame // color_speed + line_idx) % len(color_cycle)
+            line_color = color_cycle[color_offset]
+
+            # Hardware-responsive pulsing effect
+            if hardware_data:
+                pulse_rate = 0.2 + min(hardware_data.get('power_change', 0) * 0.3, 0.4)
+                pulse_threshold = 0.7 - min(hardware_data.get('temp_change', 0) * 0.2, 0.3)
+            else:
+                pulse_rate = 0.2
+                pulse_threshold = 0.7
+
+            pulse_intensity = abs(math.sin(self.workload_celebration_frame * pulse_rate))
+            use_bold = pulse_intensity > pulse_threshold
+
+            # Create the colored line with proper Rich markup nesting
+            if art_line.strip():  # Only color non-empty lines
+                if use_bold:
+                    colored_line = f'[bold][{line_color}]{art_line}[/{line_color}][/bold]'
+                else:
+                    colored_line = f'[{line_color}]{art_line}[/{line_color}]'
+            else:
+                colored_line = art_line
+                
+            lines.append(colored_line)
+        
+        # Add padding lines at bottom
+        remaining_lines = self.height - len(lines)
+        for _ in range(remaining_lines):
+            lines.append(' ' * self.width)
+            
+        # Add particle effects overlay
+        if self.workload_celebration_frame % 5 == 0:  # Update particles every 5 frames
+            lines = self._add_celebration_particles(lines)
+        
+        return lines
+
+    def _collect_hardware_data_for_celebration(self) -> Dict[str, float]:
+        """Collect hardware telemetry data for responsive celebration animations
+
+        Returns:
+            Dict with averaged hardware values and relative changes from baseline
+        """
+        if not hasattr(self, 'starfield') or not self.starfield or not self.starfield.baseline_established:
+            # No hardware data available or baseline not established
+            return {}
+
+        try:
+            total_power = total_temp = total_current = 0.0
+            total_power_change = total_temp_change = total_current_change = 0.0
+            device_count = 0
+
+            # Average hardware values across all devices
+            for device_idx in range(len(self.backend.devices)):
+                if device_idx not in self.starfield.baseline_power:
+                    continue
+
+                try:
+                    telem = self.backend.device_telemetrys[device_idx]
+                    power = float(telem.get('power', '0.0'))
+                    temp = float(telem.get('asic_temperature', '0.0'))
+                    current = float(telem.get('current', '0.0'))
+
+                    # Calculate relative changes from baseline
+                    power_change = self.starfield._get_relative_change(power, self.starfield.baseline_power[device_idx])
+                    temp_change = self.starfield._get_relative_change(temp, self.starfield.baseline_temp[device_idx])
+                    current_change = self.starfield._get_relative_change(current, self.starfield.baseline_current[device_idx])
+
+                    total_power += power
+                    total_temp += temp
+                    total_current += current
+                    total_power_change += power_change
+                    total_temp_change += temp_change
+                    total_current_change += current_change
+                    device_count += 1
+
+                except (ValueError, KeyError):
+                    continue
+
+            if device_count == 0:
+                return {}
+
+            # Return averaged values for celebration animation
+            return {
+                'power': total_power / device_count,
+                'temp': total_temp / device_count,
+                'current': total_current / device_count,
+                'power_change': total_power_change / device_count,
+                'temp_change': total_temp_change / device_count,
+                'current_change': total_current_change / device_count,
+                'device_count': device_count
+            }
+
+        except Exception as e:
+            print(f"🔧 DEBUG: Error collecting hardware data for celebration: {e}")
+            return {}
+
+    def _add_celebration_particles(self, base_lines: List[str]) -> List[str]:
+        """
+        Add animated particle effects over the celebration display
+        
+        Args:
+            base_lines: Base lines to add particles to
+            
+        Returns:
+            Modified lines with particle effects
+        """
+        enhanced_lines = []
+        
+        for line_idx, line in enumerate(base_lines):
+            line_chars = list(line) if isinstance(line, str) else [' '] * self.width
+            
+            # Add random celebration particles
+            particles = ['✦', '✧', '✩', '★', '☆', '◆', '◇', '●', '○', '▲', '▼', '♦', '♠', '♣', '♥']
+            particle_colors = ['bright_yellow', 'bright_red', 'bright_green', 'bright_blue', 
+                              'bright_magenta', 'bright_cyan', 'bright_white']
+            
+            # Hardware-responsive particle density
+            # Collect hardware data for particles
+            hardware_data = self._collect_hardware_data_for_celebration()
+
+            # Base density from celebration progress
+            celebration_progress = self.workload_celebration_frame / self.workload_celebration_duration
+            if celebration_progress < 0.3 or celebration_progress > 0.7:
+                base_density = 0.15  # Higher density during intro and outro
+            else:
+                base_density = 0.05  # Lower density during main display
+
+            # Hardware modulation of particle density
+            if hardware_data:
+                power_boost = min(hardware_data.get('power_change', 0) * 0.1, 0.1)
+                current_boost = min(hardware_data.get('current_change', 0) * 0.05, 0.05)
+                particle_density = base_density + power_boost + current_boost
+            else:
+                particle_density = base_density
+            
+            for char_idx in range(len(line_chars)):
+                if random.random() < particle_density:
+                    particle = random.choice(particles)
+                    particle_color = random.choice(particle_colors)
+                    
+                    # Only add particle if position is empty (space)
+                    if char_idx < len(line_chars) and line_chars[char_idx] == ' ':
+                        line_chars[char_idx] = f'[{particle_color}]{particle}[/{particle_color}]'
+            
+            enhanced_lines.append(''.join(line_chars))
+        
+        return enhanced_lines
 
 
 class FlowingDataStreams:
@@ -641,6 +1125,12 @@ class HardwareResponsiveASCII(Static):
     informationally dense.
     """
 
+    BINDINGS = [
+        Binding("w", "trigger_celebration", "Trigger Workload Celebration", show=True),
+        Binding("v", "exit_visualization", "Exit Visualization", show=True),
+        Binding("escape", "exit_visualization", "Exit Visualization", show=False),
+    ]
+
     def __init__(self, backend: TTSMIBackend, **kwargs):
         super().__init__(**kwargs)
         self.backend = backend
@@ -718,6 +1208,31 @@ Initialization: Starting...
             error_details = traceback.format_exc()
             self.update(f"[red]Animation Error: {e}[/red]\n\nDebug info:\n{error_details}")
 
+    def action_trigger_celebration(self) -> None:
+        """Trigger workload celebration manually"""
+        print("🔧 DEBUG: 'w' key pressed on HardwareResponsiveASCII widget!")
+        if hasattr(self, 'starfield') and self.starfield:
+            # Manually trigger the celebration
+            self.starfield.workload_detected = True
+            self.starfield.workload_detection_time = time.time()
+            self.starfield.workload_celebration_frame = 0
+
+            # For manual testing, also trigger Hello text (simulates high threshold being reached)
+            self.starfield.show_hello_text = True
+
+            print("🎉 Workload celebration triggered from widget!")
+            print("🎊 Hello text also activated for manual testing!")
+            print(f"🔧 DEBUG: Celebration state - detected: {self.starfield.workload_detected}")
+            print(f"🔧 DEBUG: Hello text flag: {self.starfield.show_hello_text}")
+        else:
+            print("❌ Starfield not available for celebration trigger")
+
+    def action_exit_visualization(self) -> None:
+        """Exit visualization mode"""
+        print("🔧 DEBUG: Exit visualization called from widget")
+        # Signal parent to exit visualization mode
+        self.app.exit()
+
     def _render_complete_visualization(self) -> str:
         """Render the complete hardware-responsive visualization"""
         try:
@@ -738,6 +1253,31 @@ Initialization: Starting...
             enhanced_lines = self.data_streams.render_streams(starfield_lines)
 
             lines.extend(enhanced_lines)
+
+            # If workload celebration is active, add it below the starfield (unobtrusive)
+            if hasattr(self, 'starfield') and self.starfield and self.starfield.workload_detected:
+                print(f"🎨 DEBUG: Adding celebration below starfield! Frame: {self.starfield.workload_celebration_frame}")
+
+                # Add a separator line before celebration
+                lines.append("")
+                lines.append("[dim white]" + "─" * self.starfield.width + "[/dim white]")
+
+                # Get celebration content from starfield (but limit height to keep it unobtrusive)
+                celebration_lines = self.starfield._render_workload_celebration()
+                # Limit celebration to bottom portion of screen (max 8 lines)
+                max_celebration_lines = min(8, len(celebration_lines))
+                lines.extend(celebration_lines[:max_celebration_lines])
+
+                # Add simple multi-color "Hello!" text below celebration ONLY if Hello threshold reached
+                if self.starfield.show_hello_text:
+                    print(f"🎊 DEBUG: Adding Hello text - threshold reached!")
+                    hello_text = self._create_simple_hello_text(self.starfield.workload_celebration_frame)
+                    lines.append("")  # Spacing
+                    # Split multi-line hello text and add each line
+                    hello_lines = hello_text.split('\n')
+                    lines.extend(hello_lines)
+                else:
+                    print(f"📊 DEBUG: Celebration active but Hello threshold not reached")
 
             # Add footer with legend
             footer = self._create_visualization_footer()
@@ -839,7 +1379,13 @@ Press 'v' to exit visualization mode
 
         # Show baseline status and relative changes
         if hasattr(self, 'starfield') and hasattr(self.starfield, 'baseline_established'):
-            if self.starfield.baseline_established:
+            # Check if in celebration mode
+            if hasattr(self.starfield, 'workload_detected') and self.starfield.workload_detected:
+                celebration_progress = (self.starfield.workload_celebration_frame / 
+                                      self.starfield.workload_celebration_duration * 100)
+                baseline_status = f"[bold bright_green]🚀 WORKLOAD CELEBRATION MODE![/bold bright_green]"
+                change_info = f"[bright_white]Progress:[/bright_white] [bright_magenta]{celebration_progress:.1f}%[/bright_magenta] [dim white]│[/dim white] [bright_yellow]Frame:[/bright_yellow] [bright_cyan]{self.starfield.workload_celebration_frame}[/bright_cyan]"
+            elif self.starfield.baseline_established:
                 baseline_status = "[bright_green]BASELINE ESTABLISHED[/bright_green]"
                 # Calculate relative changes from baseline
                 if total_devices > 0:
@@ -864,7 +1410,7 @@ Press 'v' to exit visualization mode
 
         lines.append(f"[bright_cyan]╔═══════════════════════════════════════════════════════════════════════════════════════════╗[/bright_cyan]")
         lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_magenta]{pulse_char}[/bold bright_magenta] [bold bright_white]ADAPTIVE HARDWARE VISUALIZATION[/bold bright_white] [dim white]│[/dim white] [{status_color}]{status_text}[/{status_color}] [dim white]│[/dim white] [bright_white]Devices:[/bright_white] {total_devices} [bright_cyan]║[/bright_cyan]")
-        lines.append(f"[bright_cyan]║[/bright_cyan] {baseline_status} [dim white]│[/dim white] {change_info} [bright_cyan]║[/bright_cyan]")
+        lines.append(f"[bright_cyan]║[/bright_cyan] {baseline_status} [dim white]│[/dim white] {change_info}")
         lines.append(f"[bright_cyan]║[/bright_cyan] [bright_white]Absolute:[/bright_white] [orange1]{total_power:5.1f}W[/orange1] [bright_green]{total_current:5.1f}A[/bright_green] [bright_yellow]{avg_temp:4.1f}°C[/bright_yellow] [dim white]│[/dim white] [bright_white]Frame:[/bright_white] [bright_magenta]{self.frame_count}[/bright_magenta] [bright_cyan]║[/bright_cyan]")
         lines.append(f"[bright_cyan]╚═══════════════════════════════════════════════════════════════════════════════════════════╝[/bright_cyan]")
 
@@ -876,11 +1422,73 @@ Press 'v' to exit visualization mode
 
         lines.append(f"[bright_cyan]╔═══════════════════════════════════════════════════════════════════════════════════════════╗[/bright_cyan]")
         lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_white]COMPONENTS:[/bold bright_white] [bright_cyan]●◉○∘·[/bright_cyan] Tensix Cores [dim white]│[/dim white] [bright_magenta]█▓▒░·[/bright_magenta] Memory Ch [dim white]│[/dim white] [bright_blue]◆[/bright_blue] L1 [bright_yellow]◇[/bright_yellow] L2 [bright_red]♦[/bright_red] DDR [dim white]│[/dim white] [bright_green]✦✧✩[/bright_green] Links [bright_cyan]║[/bright_cyan]")
-        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_white]ADAPTIVE MODE:[/bold bright_white] Learns baseline over 20 samples, then shows [bold bright_green]relative changes[/bold bright_green] from idle state [bright_cyan]║[/bright_cyan]")
-        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_white]ACTIVITY LEVELS:[/bold bright_white] [dim white]Baseline[/dim white] [bright_cyan]→[/bright_cyan] [bright_green]+10%[/bright_green] [bright_yellow]+25%[/bright_yellow] [orange1]+50%[/orange1] [bold red]+100%[/bold red] • Press 'v' to exit [bright_cyan]║[/bright_cyan]")
+        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_white]WORKLOAD DETECTION:[/bold bright_white] Says [bold bright_magenta]🚀 hello[/bold bright_magenta] when activity +{int(hasattr(self, 'starfield') and getattr(self.starfield, 'workload_threshold', 0.20) * 100)}% above baseline")
+        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_white]CONTROLS:[/bold bright_white] Press 'v' to exit [dim white]│[/dim white] Press 'w' to test celebration [dim white]│[/dim white] [bright_green]+10%[/bright_green] [bright_yellow]+25%[/bright_yellow] [orange1]+50%[/orange1] triggers celebration [bright_cyan]║[/bright_cyan]")
         lines.append(f"[bright_cyan]╚═══════════════════════════════════════════════════════════════════════════════════════════╝[/bright_cyan]")
 
         return lines
+
+    def _create_simple_hello_text(self, frame: int) -> str:
+        """Create large multi-color 'Hello!' text using ASCII art for celebration
+
+        Args:
+            frame: Current celebration frame for color cycling
+
+        Returns:
+            Multi-line formatted hello text with hardware-responsive colors
+        """
+        # Multi-color palette that cycles through the celebration
+        colors = ['bright_red', 'bright_yellow', 'bright_green', 'bright_cyan',
+                  'bright_blue', 'bright_magenta', 'bright_white']
+
+        # ASCII art for "Hello!" using block characters
+        # Each letter is 3 lines tall, 4 characters wide (except ! which is 2 wide)
+        ascii_letters = {
+            'H': ['█   █', '█████', '█   █'],
+            'e': ['█████', '███  ', '█████'],
+            'l': ['█    ', '█    ', '█████'],
+            'l': ['█    ', '█    ', '█████'],  # Same as 'l'
+            'o': [' ███ ', '█   █', ' ███ '],
+            '!': ['██', '██', '██']
+        }
+
+        # Create the 3-line ASCII art
+        hello_letters = ['H', 'e', 'l', 'l', 'o', '!']
+        line1_parts = []
+        line2_parts = []
+        line3_parts = []
+
+        for i, letter in enumerate(hello_letters):
+            # Cycle through colors based on frame and letter position
+            color_index = (frame // 5 + i) % len(colors)
+            color = colors[color_index]
+
+            # Get ASCII art for this letter
+            art_lines = ascii_letters[letter]
+
+            # Add colored version of each line
+            line1_parts.append(f'[{color}]{art_lines[0]}[/{color}]')
+            line2_parts.append(f'[{color}]{art_lines[1]}[/{color}]')
+            line3_parts.append(f'[{color}]{art_lines[2]}[/{color}]')
+
+            # Add spacing between letters (except after !)
+            if letter != '!':
+                line1_parts.append(' ')
+                line2_parts.append(' ')
+                line3_parts.append(' ')
+
+        # Join each line
+        line1 = ''.join(line1_parts)
+        line2 = ''.join(line2_parts)
+        line3 = ''.join(line3_parts)
+
+        # Center all lines (assume 80-character width)
+        centered_line1 = line1.center(100)  # Give more space for Rich markup
+        centered_line2 = line2.center(100)
+        centered_line3 = line3.center(100)
+
+        # Return as multi-line string
+        return f"{centered_line1}\n{centered_line2}\n{centered_line3}"
 
 
 class AnimatedDisplayContainer(Container):
@@ -891,6 +1499,7 @@ class AnimatedDisplayContainer(Container):
     BINDINGS = [
         Binding("v", "toggle_visualization", "Toggle Visualization", show=True),
         Binding("escape", "exit_visualization", "Exit Visualization", show=False),
+        Binding("w", "trigger_workload_celebration", "Test Workload Celebration", show=True),
     ]
 
     def __init__(self, backend: TTSMIBackend, **kwargs):
@@ -940,6 +1549,26 @@ class AnimatedDisplayContainer(Container):
 
         # Signal parent to restore normal view
         self.post_message_no_wait(self.VisualizationToggled(False))
+
+    def action_trigger_workload_celebration(self) -> None:
+        """Manually trigger workload celebration for testing"""
+        print(f"🔧 DEBUG: 'w' key pressed! Visualization mode: {self.is_visualization_mode}")
+        print(f"🔧 DEBUG: Animated display exists: {self.animated_display is not None}")
+        
+        if self.is_visualization_mode and self.animated_display and hasattr(self.animated_display, 'starfield'):
+            # Manually trigger the celebration
+            starfield = self.animated_display.starfield
+            starfield.workload_detected = True
+            starfield.workload_detection_time = time.time()
+            starfield.workload_celebration_frame = 0
+            print("🎉 Manual workload celebration triggered!")
+            print(f"🔧 DEBUG: Starfield celebration state set - detected: {starfield.workload_detected}, frame: {starfield.workload_celebration_frame}")
+        else:
+            print("❌ Cannot trigger celebration - not in visualization mode or display not available")
+            if not self.is_visualization_mode:
+                print("   Hint: Press 'v' first to enter visualization mode")
+            if not self.animated_display:
+                print("   Hint: Animated display not initialized")
 
     class VisualizationToggled:
         """Message sent when visualization is toggled"""

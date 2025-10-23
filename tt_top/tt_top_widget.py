@@ -703,6 +703,10 @@ class TTTopDisplay(Static):
 
         # Framework detection patterns
         framework_patterns = {
+            'ttnn': [
+                r'python.*-m.*ttnn', r'python.*ttnn\.', r'ttnn\.examples\.',
+                r'python.*ttnn', r'ttnn\..*', r'ttnn/'
+            ],
             'pytorch': [
                 r'python.*torch', r'torchrun', r'python.*transformers',
                 r'python.*accelerate', r'python.*deepspeed', r'python.*lightning'
@@ -733,6 +737,10 @@ class TTTopDisplay(Static):
             ],
             'audio_speech': [
                 r'whisper', r'wav2vec', r'hubert', r'speechbrain', r'espnet'
+            ],
+            'tensor_ops': [
+                r'tensor', r'matmul', r'conv', r'linear', r'activation',
+                r'reshape', r'transpose', r'permute'
             ]
         }
 
@@ -740,7 +748,10 @@ class TTTopDisplay(Static):
         workload_patterns = {
             'training': [r'train', r'training', r'fit', r'finetune', r'fine-tune'],
             'inference': [r'inference', r'infer', r'predict', r'generate', r'serve'],
-            'evaluation': [r'eval', r'evaluate', r'test', r'benchmark']
+            'evaluation': [r'eval', r'evaluate', r'test', r'benchmark'],
+            'conversion': [r'convert', r'convert_to_from', r'to_from', r'transform'],
+            'example': [r'examples\.', r'example', r'demo', r'tutorial'],
+            'usage': [r'usage\.', r'usage', r'how_to', r'howto']
         }
 
         cmdline_lower = cmdline.lower()
@@ -866,6 +877,10 @@ class TTTopDisplay(Static):
             ],
             'audio_speech': [
                 r'whisper', r'wav2vec', r'hubert', r'speechbrain', r'espnet'
+            ],
+            'tensor_ops': [
+                r'tensor', r'matmul', r'conv', r'linear', r'activation',
+                r'reshape', r'transpose', r'permute'
             ]
         }
 
@@ -873,7 +888,10 @@ class TTTopDisplay(Static):
         workload_patterns = {
             'training': [r'train', r'training', r'fit', r'finetune', r'fine-tune'],
             'inference': [r'inference', r'infer', r'predict', r'generate', r'serve'],
-            'evaluation': [r'eval', r'evaluate', r'test', r'benchmark']
+            'evaluation': [r'eval', r'evaluate', r'test', r'benchmark'],
+            'conversion': [r'convert', r'convert_to_from', r'to_from', r'transform'],
+            'example': [r'examples\.', r'example', r'demo', r'tutorial'],
+            'usage': [r'usage\.', r'usage', r'how_to', r'howto']
         }
 
         cmdline_lower = cmdline.lower()
@@ -1048,6 +1066,7 @@ class TTTopDisplay(Static):
 
         # Framework color coding
         framework_colors = {
+            'ttnn': 'bright_cyan',
             'pytorch': 'orange1',
             'tensorflow': 'bright_blue',
             'jax': 'bright_green',
@@ -1060,6 +1079,9 @@ class TTTopDisplay(Static):
             'training': '🔥',
             'inference': '⚡',
             'evaluation': '📊',
+            'conversion': '🔄',
+            'example': '📚',
+            'usage': '⚙️',
             'unknown': '❓'
         }
 
