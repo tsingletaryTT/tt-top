@@ -215,16 +215,33 @@ class HardwareStarfield:
         if num_devices == 0:
             return
 
-        # Distribute devices across screen space
-        device_spacing_x = self.width // max(num_devices, 1)
-        device_spacing_y = self.height // 2  # Use middle of screen as baseline
+        # Distribute devices across screen space - ENHANCED FOR MULTI-CARD SYSTEMS
+        # For many devices (>4), use multi-row layout instead of single horizontal row
+        if num_devices <= 4:
+            # Traditional horizontal layout for 1-4 devices
+            device_spacing_x = self.width // max(num_devices, 1)
+            device_spacing_y = self.height // 2
+            devices_per_row = num_devices
+            num_rows = 1
+        else:
+            # Multi-row grid layout for 5+ devices (e.g., quietbox with 8 cards)
+            devices_per_row = min(4, num_devices)  # Max 4 devices per row
+            num_rows = (num_devices + devices_per_row - 1) // devices_per_row
+            device_spacing_x = self.width // devices_per_row
+            device_spacing_y = self.height // max(num_rows, 1)
 
         for device_idx, device in enumerate(backend.devices):
-            # Device center position - spread devices across full screen
-            center_x = device_spacing_x * device_idx + device_spacing_x // 2
-            # Stagger devices vertically across the middle portion of screen
-            vertical_offset = (device_idx % 2) * (self.height // 6) - (self.height // 12)
-            center_y = device_spacing_y + vertical_offset
+            # Calculate row and column for this device
+            if num_devices <= 4:
+                row_idx = 0
+                col_idx = device_idx
+            else:
+                row_idx = device_idx // devices_per_row
+                col_idx = device_idx % devices_per_row
+
+            # Device center position with multi-row layout support
+            center_x = device_spacing_x * col_idx + device_spacing_x // 2
+            center_y = device_spacing_y * row_idx + device_spacing_y // 2
 
             # Create core grid based on architecture
             if device.as_gs():
@@ -240,18 +257,35 @@ class HardwareStarfield:
                 grid_rows, grid_cols = 8, 10   # Default
                 cluster_size = 12
 
-            # Create stars for Tensix cores - distribute across more screen area
-            max_rows = min(grid_rows, self.height // 3)  # Use up to 1/3 of screen height per device
-            max_cols = min(grid_cols, self.width // 4)   # Use up to 1/4 of screen width per device
+            # Adaptive star density based on device count (prevent overcrowding)
+            density_factor = min(1.0, 4.0 / max(num_devices, 1))  # Reduce stars for many devices
+
+            # Create stars for Tensix cores with adaptive sizing
+            if num_devices <= 4:
+                # Full size for 1-4 devices
+                max_rows = min(grid_rows, self.height // 3)
+                max_cols = min(grid_cols, self.width // 4)
+                spacing_x = 3
+                spacing_y = 2
+            else:
+                # Compact size for 5+ devices
+                max_rows = min(grid_rows, self.height // (num_rows * 2))
+                max_cols = min(grid_cols, self.width // (devices_per_row * 2))
+                spacing_x = 2
+                spacing_y = 1
 
             for row in range(max_rows):
                 for col in range(max_cols):
                     if star_id >= self.num_stars:
                         break
 
-                    # Position relative to device center with more spread
-                    star_x = center_x + (col - max_cols//2) * 3  # Wider horizontal spacing
-                    star_y = center_y + (row - max_rows//2) * 2  # Taller vertical spacing
+                    # Skip some stars for multi-device systems to reduce clutter
+                    if num_devices > 4 and random.random() > density_factor:
+                        continue
+
+                    # Position relative to device center with adaptive spacing
+                    star_x = center_x + (col - max_cols//2) * spacing_x
+                    star_y = center_y + (row - max_rows//2) * spacing_y
 
                     # Ensure star is within bounds
                     if 0 <= star_x < self.width and 0 <= star_y < self.height:
@@ -272,13 +306,19 @@ class HardwareStarfield:
 
             # Create memory channel stars (closer to device)
             memory_channels = 4 if device.as_gs() else 8 if device.as_wh() else 12
-            for channel in range(min(memory_channels, 8)):
+            # Reduce memory channels for multi-device layouts
+            max_mem_channels = 8 if num_devices <= 4 else 4
+            for channel in range(min(memory_channels, max_mem_channels)):
                 if star_id >= self.num_stars:
                     break
 
-                # Position memory stars around device perimeter with better spacing
+                # Position memory stars around device perimeter - adaptive radius for device count
                 angle = 2 * math.pi * channel / memory_channels
-                radius = max(8, min(self.width // 8, self.height // 4))  # Adaptive radius
+                if num_devices <= 4:
+                    radius = max(8, min(self.width // 8, self.height // 4))
+                else:
+                    # Smaller radius for multi-device systems
+                    radius = max(4, min(device_spacing_x // 4, device_spacing_y // 4))
                 star_x = int(center_x + radius * math.cos(angle))
                 star_y = int(center_y + radius * math.sin(angle))
 
@@ -299,17 +339,24 @@ class HardwareStarfield:
                     star_id += 1
 
             # Create memory hierarchy "planets" (larger visual elements)
-            hierarchy_levels = ['L1_cache', 'L2_cache', 'DDR_controller']
-            for level_idx, level in enumerate(hierarchy_levels):
-                if star_id >= self.num_stars:
-                    break
+            # Skip planets for very crowded layouts (>6 devices)
+            if num_devices <= 6:
+                hierarchy_levels = ['L1_cache', 'L2_cache', 'DDR_controller']
+                for level_idx, level in enumerate(hierarchy_levels):
+                    if star_id >= self.num_stars:
+                        break
 
-                # Position at different radii around device center with better spread
-                base_radius = max(12, min(self.width // 6, self.height // 3))
-                radius = base_radius + level_idx * 6
-                angle = 2 * math.pi * level_idx / 3  # 3 levels, evenly spaced
-                planet_x = int(center_x + radius * math.cos(angle))
-                planet_y = int(center_y + radius * math.sin(angle))
+                    # Position at different radii around device center - adaptive for device count
+                    if num_devices <= 4:
+                        base_radius = max(12, min(self.width // 6, self.height // 3))
+                        radius = base_radius + level_idx * 6
+                    else:
+                        # Tighter clustering for multi-device systems
+                        base_radius = max(6, min(device_spacing_x // 3, device_spacing_y // 3))
+                        radius = base_radius + level_idx * 3
+                    angle = 2 * math.pi * level_idx / 3  # 3 levels, evenly spaced
+                    planet_x = int(center_x + radius * math.cos(angle))
+                    planet_y = int(center_y + radius * math.sin(angle))
 
                 if 0 <= planet_x < self.width and 0 <= planet_y < self.height:
                     planet = {
@@ -328,34 +375,48 @@ class HardwareStarfield:
                     self.stars.append(planet)
                     star_id += 1
 
-        # Add interconnect stars between devices
+        # Add interconnect stars between devices (only for adjacent devices to avoid clutter)
         for i in range(num_devices):
-            for j in range(i + 1, num_devices):
-                if star_id >= self.num_stars:
-                    break
+            # Only connect to next device in sequence (not all pairs)
+            j = i + 1
+            if j >= num_devices or star_id >= self.num_stars:
+                continue
 
-                # Position between device centers with better distribution
+            # Calculate positions for multi-row layout
+            if num_devices <= 4:
                 device_i_x = device_spacing_x * i + device_spacing_x // 2
+                device_i_y = self.height // 2
                 device_j_x = device_spacing_x * j + device_spacing_x // 2
-                interconnect_x = (device_i_x + device_j_x) // 2
-                # Vary interconnect vertical position based on device pair
-                interconnect_y = self.height // 2 + ((i + j) % 3 - 1) * (self.height // 8)
+                device_j_y = self.height // 2
+            else:
+                row_i = i // devices_per_row
+                col_i = i % devices_per_row
+                row_j = j // devices_per_row
+                col_j = j % devices_per_row
+                device_i_x = device_spacing_x * col_i + device_spacing_x // 2
+                device_i_y = device_spacing_y * row_i + device_spacing_y // 2
+                device_j_x = device_spacing_x * col_j + device_spacing_x // 2
+                device_j_y = device_spacing_y * row_j + device_spacing_y // 2
 
-                if 0 <= interconnect_x < self.width and 0 <= interconnect_y < self.height:
-                    star = {
-                        'id': star_id,
-                        'x': interconnect_x,
-                        'y': interconnect_y,
-                        'device_idx': i,  # Primary device
-                        'connected_device': j,
-                        'component_type': 'interconnect',
-                        'brightness': 0.2,
-                        'color': 'bright_green',
-                        'twinkle_phase': random.random() * 2 * math.pi,
-                        'twinkle_speed': 0.02 + random.random() * 0.08
-                    }
-                    self.stars.append(star)
-                    star_id += 1
+            # Position between device centers
+            interconnect_x = (device_i_x + device_j_x) // 2
+            interconnect_y = (device_i_y + device_j_y) // 2
+
+            if 0 <= interconnect_x < self.width and 0 <= interconnect_y < self.height:
+                star = {
+                    'id': star_id,
+                    'x': interconnect_x,
+                    'y': interconnect_y,
+                    'device_idx': i,  # Primary device
+                    'connected_device': j,
+                    'component_type': 'interconnect',
+                    'brightness': 0.2,
+                    'color': 'bright_green',
+                    'twinkle_phase': random.random() * 2 * math.pi,
+                    'twinkle_speed': 0.02 + random.random() * 0.08
+                }
+                self.stars.append(star)
+                star_id += 1
 
     def _update_baseline(self, backend: Any) -> None:  # JSONBackendAdapter or compatible
         """Update the adaptive baseline from current telemetry readings"""
