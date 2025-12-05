@@ -1,0 +1,142 @@
+{
+  "time": "2024-12-02T10:30:00Z",
+  "host_info": {
+    "OS": "Linux",
+    "Distro": "Ubuntu 22.04",
+    "Kernel": "5.15.0-91-generic",
+    "Hostname": "tt-multi-dev",
+    "Platform": "x86_64",
+    "Python": "3.10.12",
+    "Memory": "256GB",
+    "Driver": "tenstorrent-kmd 1.27"
+  },
+  "host_sw_vers": {
+    "tt_smi": "1.2.0",
+    "pyluwen": "0.8.5"
+  },
+  "device_info": [
+    {
+      "smbus_telem": {
+        "BOARD_ID": "0x01",
+        "DDR_SPEED": "6400",
+        "DDR_STATUS": "255",
+        "ARC0_HEALTH": "1",
+        "ARC3_HEALTH": "1",
+        "AICLK": "1000",
+        "ASIC_TEMPERATURE": "51.2",
+        "VCORE": "0.85",
+        "TDP": "150",
+        "FAULTS": "0"
+      },
+      "board_info": {
+        "bus_id": "0000:01:00.0",
+        "board_type": "n150",
+        "board_id": "WH-150-001",
+        "coords": "(0,0)",
+        "dram_status": "Trained",
+        "dram_speed": "6400",
+        "pcie_speed": "Gen4",
+        "pcie_width": "x16"
+      },
+      "telemetry": {
+        "voltage": "0.85",
+        "current": "24.2",
+        "aiclk": "1000",
+        "power": "42.8",
+        "asic_temperature": "51.2"
+      },
+      "firmwares": {
+        "arc_fw": "2.1.0",
+        "arc_fw_date": "2024-11-20"
+      },
+      "limits": {
+        "vdd_min": "0.80",
+        "vdd_max": "0.95",
+        "tdp_limit": "150",
+        "tdc_limit": "200"
+      }
+    },
+    {
+      "smbus_telem": {
+        "BOARD_ID": "0x02",
+        "DDR_SPEED": "6400",
+        "DDR_STATUS": "255",
+        "ARC0_HEALTH": "1",
+        "ARC3_HEALTH": "1",
+        "AICLK": "1000",
+        "ASIC_TEMPERATURE": "49.8",
+        "VCORE": "0.85",
+        "TDP": "150",
+        "FAULTS": "0"
+      },
+      "board_info": {
+        "bus_id": "0000:02:00.0",
+        "board_type": "n300",
+        "board_id": "WH-300-002",
+        "coords": "(1,0)",
+        "dram_status": "Trained",
+        "dram_speed": "6400",
+        "pcie_speed": "Gen4",
+        "pcie_width": "x16"
+      },
+      "telemetry": {
+        "voltage": "0.85",
+        "current": "26.1",
+        "aiclk": "1000",
+        "power": "46.3",
+        "asic_temperature": "49.8"
+      },
+      "firmwares": {
+        "arc_fw": "2.1.0",
+        "arc_fw_date": "2024-11-20"
+      },
+      "limits": {
+        "vdd_min": "0.80",
+        "vdd_max": "0.95",
+        "tdp_limit": "150",
+        "tdc_limit": "200"
+      }
+    },
+    {
+      "smbus_telem": {
+        "BOARD_ID": "0x03",
+        "DDR_SPEED": "3200",
+        "DDR_STATUS": "15",
+        "ARC0_HEALTH": "1",
+        "ARC3_HEALTH": "1",
+        "AICLK": "900",
+        "ASIC_TEMPERATURE": "47.3",
+        "VCORE": "0.80",
+        "TDP": "75",
+        "FAULTS": "0"
+      },
+      "board_info": {
+        "bus_id": "0000:03:00.0",
+        "board_type": "e75",
+        "board_id": "GS-75-003",
+        "coords": "(2,0)",
+        "dram_status": "Trained",
+        "dram_speed": "3200",
+        "pcie_speed": "Gen3",
+        "pcie_width": "x16"
+      },
+      "telemetry": {
+        "voltage": "0.80",
+        "current": "17.9",
+        "aiclk": "900",
+        "power": "35.1",
+        "asic_temperature": "47.3"
+      },
+      "firmwares": {
+        "arc_fw": "1.5.2",
+        "arc_fw_date": "2024-11-15"
+      },
+      "limits": {
+        "vdd_min": "0.75",
+        "vdd_max": "0.90",
+        "tdp_limit": "75",
+        "tdc_limit": "100"
+      }
+    }
+  ]
+}

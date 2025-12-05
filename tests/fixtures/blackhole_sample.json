@@ -1,0 +1,65 @@
+{
+  "time": "2024-12-02T10:30:00Z",
+  "host_info": {
+    "OS": "Linux",
+    "Distro": "Ubuntu 22.04",
+    "Kernel": "5.15.0-91-generic",
+    "Hostname": "tt-dev-machine",
+    "Platform": "x86_64",
+    "Python": "3.10.12",
+    "Memory": "256GB",
+    "Driver": "tenstorrent-kmd 1.27"
+  },
+  "host_sw_vers": {
+    "tt_smi": "1.2.0",
+    "pyluwen": "0.8.5"
+  },
+  "device_info": [
+    {
+      "smbus_telem": {
+        "BOARD_ID": "0x03",
+        "DDR_SPEED": "8000",
+        "DDR_STATUS": "4095",
+        "ARC0_HEALTH": "1",
+        "ARC3_HEALTH": "1",
+        "AICLK": "1200",
+        "ASIC_TEMPERATURE": "58.7",
+        "VCORE": "0.90",
+        "TDP": "300",
+        "FAULTS": "0"
+      },
+      "board_info": {
+        "bus_id": "0000:03:00.0",
+        "board_type": "p150",
+        "board_id": "BH-150-C1",
+        "coords": "(0,0)",
+        "dram_status": "Trained",
+        "dram_speed": "8000",
+        "pcie_speed": "Gen5",
+        "pcie_width": "x16"
+      },
+      "telemetry": {
+        "voltage": "0.90",
+        "current": "42.8",
+        "aiclk": "1200",
+        "power": "78.5",
+        "asic_temperature": "58.7"
+      },
+      "firmwares": {
+        "arc_fw": "3.0.1",
+        "arc_fw_date": "2024-11-25",
+        "eth_fw": "2.0.0",
+        "m3_bl_fw": "1.2.0",
+        "m3_app_fw": "1.5.0"
+      },
+      "limits": {
+        "vdd_min": "0.85",
+        "vdd_max": "1.00",
+        "tdp_limit": "300",
+        "tdc_limit": "400",
+        "asic_fmax": "1600",
+        "therm_trip_l1_limit": "110"
+      }
+    }
+  ]
+}
