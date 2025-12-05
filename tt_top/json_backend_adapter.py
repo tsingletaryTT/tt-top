@@ -9,7 +9,7 @@ instead of accessing hardware directly. This follows the UNIX philosophy of
 composable tools with clean data interfaces.
 
 Architecture:
-    tt-smi --json --continuous (subprocess)
+    tt-smi -s --continuous (subprocess)
         ↓
     JSON stream to stdout
         ↓
@@ -120,7 +120,7 @@ class JSONBackendAdapter:
 
     def __init__(
         self,
-        tt_smi_command: str = "tt-smi --json --continuous",
+        tt_smi_command: str = "tt-smi -s --continuous",
         mock_mode: bool = False,
         mock_json_file: Optional[str] = None,
     ):
@@ -128,7 +128,7 @@ class JSONBackendAdapter:
         Initialize JSON backend adapter
 
         Args:
-            tt_smi_command: Command to spawn tt-smi (default: "tt-smi --json --continuous")
+            tt_smi_command: Command to spawn tt-smi (default: "tt-smi -s --continuous")
             mock_mode: If True, use mock data instead of subprocess
             mock_json_file: Path to JSON file for mock mode
         """

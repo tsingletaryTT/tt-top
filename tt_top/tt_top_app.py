@@ -297,11 +297,11 @@ Architecture:
   and consumes its JSON telemetry output. This provides clean separation
   between data acquisition (tt-smi) and visualization (tt-top).
 
-  Data flow: tt-smi --json --continuous → JSON stream → tt-top → visualization
+  Data flow: tt-smi -s --continuous → JSON stream → tt-top → visualization
 
 Requirements:
   - tt-smi must be installed and accessible in PATH (or via --tt-smi-path)
-  - tt-smi must support --json --continuous flags for JSON streaming mode
+  - tt-smi must support -s --continuous flags for JSON streaming mode
 
 For more information, visit: https://github.com/tenstorrent/tt-top
         """,
@@ -382,7 +382,7 @@ def tt_top_main() -> int:
 
             try:
                 # Build tt-smi command with appropriate flags
-                tt_smi_cmd = f"{args.tt_smi_path} --json --continuous"
+                tt_smi_cmd = f"{args.tt_smi_path} -s --continuous"
 
                 # Add device filtering if specified
                 if args.device is not None:
@@ -407,7 +407,7 @@ def tt_top_main() -> int:
                     logger.error("")
                     logger.error("Troubleshooting:")
                     logger.error("  1. Ensure tt-smi is installed: which tt-smi")
-                    logger.error("  2. Test tt-smi directly: tt-smi --json")
+                    logger.error("  2. Test tt-smi directly: tt-smi -s")
                     logger.error("  3. Check tt-smi supports continuous mode: tt-smi --help")
                     logger.error("  4. Try mock mode for testing: tt-top --mock")
                     logger.error("")
@@ -423,7 +423,7 @@ def tt_top_main() -> int:
                 logger.error("")
                 logger.error("Possible causes:")
                 logger.error("  - tt-smi not installed or not in PATH")
-                logger.error("  - tt-smi does not support --json --continuous flags")
+                logger.error("  - tt-smi does not support -s --continuous flags")
                 logger.error("")
                 logger.error("Solutions:")
                 logger.error("  - Install tt-smi from Tenstorrent tools")
