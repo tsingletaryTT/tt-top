@@ -10,7 +10,7 @@ import base64
 import inspect
 import datetime
 from pathlib import Path
-from typing import Any, Union, List, TypeVar, Generic
+from typing import Any, Union, List, TypeVar, Generic, Optional
 
 try:
     # Try the newer v2 pydantic and use that first
@@ -155,59 +155,59 @@ class HostSWVersions(ElasticModel):
 
 @optional
 class SmbusTelem(ElasticModel):
-    BOARD_ID: str
-    ENUM_VERSION: str
-    DEVICE_ID: str
-    ASIC_RO: str
-    ASIC_IDD: str
-    BOARD_ID_HIGH: str
-    BOARD_ID_LOW: str
-    ARC0_FW_VERSION: str
-    ARC1_FW_VERSION: str
-    ARC2_FW_VERSION: str
-    ARC3_FW_VERSION: str
-    SPIBOOTROM_FW_VERSION: str
-    ETH_FW_VERSION: str
-    M3_BL_FW_VERSION: str
-    M3_APP_FW_VERSION: str
-    DDR_SPEED: str
-    DDR_STATUS: str
-    ETH_STATUS0: str
-    ETH_STATUS1: str
-    PCIE_STATUS: str
-    FAULTS: str
-    ARC0_HEALTH: str
-    ARC1_HEALTH: str
-    ARC2_HEALTH: str
-    ARC3_HEALTH: str
-    FAN_SPEED: str
-    AICLK: str
-    AXICLK: str
-    ARCCLK: str
-    THROTTLER: str
-    VCORE: str
-    ASIC_TEMPERATURE: str
-    VREG_TEMPERATURE: str
-    BOARD_TEMPERATURE: str
-    TDP: str
-    TDC: str
-    VDD_LIMITS: str
-    THM_LIMITS: str
-    WH_FW_DATE: str
-    ASIC_TMON0: str
-    ASIC_TMON1: str
-    MVDDQ_POWER: str
-    GDDR_TRAIN_TEMP0: str
-    GDDR_TRAIN_TEMP1: str
-    BOOT_DATE: str
-    RT_SECONDS: str
-    AUX_STATUS: str
-    ETH_DEBUG_STATUS0: str
-    ETH_DEBUG_STATUS1: str
-    TT_FLASH_VERSION: str
-    THERM_TRIP_COUNT: str
-    INPUT_POWER: str
-    BOARD_POWER_LIMIT: str
+    BOARD_ID: Optional[str] = None
+    ENUM_VERSION: Optional[str] = None
+    DEVICE_ID: Optional[str] = None
+    ASIC_RO: Optional[str] = None
+    ASIC_IDD: Optional[str] = None
+    BOARD_ID_HIGH: Optional[str] = None
+    BOARD_ID_LOW: Optional[str] = None
+    ARC0_FW_VERSION: Optional[str] = None
+    ARC1_FW_VERSION: Optional[str] = None
+    ARC2_FW_VERSION: Optional[str] = None
+    ARC3_FW_VERSION: Optional[str] = None
+    SPIBOOTROM_FW_VERSION: Optional[str] = None
+    ETH_FW_VERSION: Optional[str] = None
+    M3_BL_FW_VERSION: Optional[str] = None
+    M3_APP_FW_VERSION: Optional[str] = None
+    DDR_SPEED: Optional[str] = None
+    DDR_STATUS: Optional[str] = None
+    ETH_STATUS0: Optional[str] = None
+    ETH_STATUS1: Optional[str] = None
+    PCIE_STATUS: Optional[str] = None
+    FAULTS: Optional[str] = None
+    ARC0_HEALTH: Optional[str] = None
+    ARC1_HEALTH: Optional[str] = None
+    ARC2_HEALTH: Optional[str] = None
+    ARC3_HEALTH: Optional[str] = None
+    FAN_SPEED: Optional[str] = None
+    AICLK: Optional[str] = None
+    AXICLK: Optional[str] = None
+    ARCCLK: Optional[str] = None
+    THROTTLER: Optional[str] = None
+    VCORE: Optional[str] = None
+    ASIC_TEMPERATURE: Optional[str] = None
+    VREG_TEMPERATURE: Optional[str] = None
+    BOARD_TEMPERATURE: Optional[str] = None
+    TDP: Optional[str] = None
+    TDC: Optional[str] = None
+    VDD_LIMITS: Optional[str] = None
+    THM_LIMITS: Optional[str] = None
+    WH_FW_DATE: Optional[str] = None
+    ASIC_TMON0: Optional[str] = None
+    ASIC_TMON1: Optional[str] = None
+    MVDDQ_POWER: Optional[str] = None
+    GDDR_TRAIN_TEMP0: Optional[str] = None
+    GDDR_TRAIN_TEMP1: Optional[str] = None
+    BOOT_DATE: Optional[str] = None
+    RT_SECONDS: Optional[str] = None
+    AUX_STATUS: Optional[str] = None
+    ETH_DEBUG_STATUS0: Optional[str] = None
+    ETH_DEBUG_STATUS1: Optional[str] = None
+    TT_FLASH_VERSION: Optional[str] = None
+    THERM_TRIP_COUNT: Optional[str] = None
+    INPUT_POWER: Optional[str] = None
+    BOARD_POWER_LIMIT: Optional[str] = None
 
 
 @optional

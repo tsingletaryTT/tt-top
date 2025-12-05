@@ -539,23 +539,17 @@ class JSONBackendAdapter:
 
     def cleanup(self) -> None:
         """
-        Cleanup resources (terminate subprocess)
+        Cleanup resources (remove snapshot file)
 
         Should be called on application shutdown.
         """
-        if self.process:
-            logger.info("Terminating tt-smi subprocess")
-            try:
-                self.process.terminate()
-                self.process.wait(timeout=2.0)
-            except subprocess.TimeoutExpired:
-                logger.warning("Subprocess did not terminate, killing")
-                self.process.kill()
-            except Exception as e:
-                logger.error(f"Error during cleanup: {e}")
-
-            self.subprocess_running = False
+        try:
+            if os.path.exists(self.snapshot_file):
+                os.remove(self.snapshot_file)
+                logger.debug(f"Cleaned up snapshot file: {self.snapshot_file}")
+        except Exception as e:
+            logger.debug(f"Could not clean up snapshot file: {e}")
 
     def __del__(self):
-        """Destructor - ensure subprocess is terminated"""
+        """Destructor - ensure resources are cleaned up"""
         self.cleanup()
