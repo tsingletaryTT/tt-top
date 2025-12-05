@@ -198,7 +198,7 @@ class HardwareStarfield:
         self.hello_shown_count = 0  # Count how many times Hello has been shown
         self.show_hello_text = False  # Flag to show Hello text during current celebration
 
-    def initialize_stars(self, backend: Any)  # JSONBackendAdapter or compatible -> None:
+    def initialize_stars(self, backend: Any) -> None:  # JSONBackendAdapter or compatible
         """Initialize stars based on actual hardware topology
 
         Creates stars that correspond to real hardware elements:
@@ -357,7 +357,7 @@ class HardwareStarfield:
                     self.stars.append(star)
                     star_id += 1
 
-    def _update_baseline(self, backend: Any)  # JSONBackendAdapter or compatible -> None:
+    def _update_baseline(self, backend: Any) -> None:  # JSONBackendAdapter or compatible
         """Update the adaptive baseline from current telemetry readings"""
         if self.baseline_established:
             return
@@ -407,7 +407,7 @@ class HardwareStarfield:
 
         return (current_value - baseline_value) / baseline_value
 
-    def _detect_new_workload(self, backend: Any)  # JSONBackendAdapter or compatible -> bool:
+    def _detect_new_workload(self, backend: Any) -> bool:  # JSONBackendAdapter or compatible
         """
         Detect if a new workload has started based on significant activity increase from baseline
         
@@ -456,7 +456,7 @@ class HardwareStarfield:
         
         return new_workload_detected
 
-    def _should_show_hello(self, backend: Any)  # JSONBackendAdapter or compatible -> bool:
+    def _should_show_hello(self, backend: Any) -> bool:  # JSONBackendAdapter or compatible
         """
         Check if Hello text should be displayed based on higher activity threshold
 
