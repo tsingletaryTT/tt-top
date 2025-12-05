@@ -123,7 +123,9 @@ def create_simple_display_app():
     from textual.app import App
     from textual.binding import Binding
     from textual.containers import Container
-    from tt_top.tt_smi_backend import TTSMIBackend, HARDWARE_AVAILABLE
+    # Backend interface - works with JSONBackendAdapter or any compatible backend
+    from typing import Any
+    HARDWARE_AVAILABLE = False  # Legacy - not used in JSON-only mode
     from tt_top.safety import SafetyConfig
 
     class SimpleDisplayApp(App):
@@ -149,7 +151,8 @@ def create_simple_display_app():
 
             # Create backend
             if HARDWARE_AVAILABLE:
-                from tt_top.tt_smi_backend import detect_chips_with_callback
+                # Legacy code - not used in JSON-only mode
+                # Backend initialization now happens in tt_top_app.py
                 devices = detect_chips_with_callback(print_status=False)
                 if not devices:
                     from tt_top.mock_hardware import MockPciChip
@@ -159,7 +162,10 @@ def create_simple_display_app():
                 devices = [MockPciChip(0)]
 
             safety_config = SafetyConfig()
-            self.backend = TTSMIBackend(devices=devices, fully_init=True, safety_config=safety_config)
+            # Legacy: self.backend = TTSMIBackend(devices=devices, fully_init=True, safety_config=safety_config)
+            # Now use JSONBackendAdapter initialized in tt_top_app.py
+            from tt_top.json_backend_adapter import JSONBackendAdapter
+            self.backend = JSONBackendAdapter(mock_mode=True)
 
         def compose(self):
             yield SimpleHardwareDisplay(backend=self.backend)

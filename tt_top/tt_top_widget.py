@@ -16,7 +16,8 @@ from textual.containers import Container, Vertical
 from textual.app import ComposeResult
 from textual.events import Key
 from textual.binding import Binding
-from tt_top.tt_smi_backend import TTSMIBackend
+# Backend interface - works with JSONBackendAdapter or any compatible backend
+from typing import Any
 from tt_top import constants
 
 # Cross-platform ScrollView import for Textual compatibility
@@ -39,7 +40,7 @@ class TTTopDisplay(Static):
     More compatible across Textual versions.
     """
 
-    def __init__(self, backend: TTSMIBackend, **kwargs):
+    def __init__(self, backend: Any  # JSONBackendAdapter or compatible, **kwargs):
         super().__init__(**kwargs)
         self.backend = backend
         self.animation_frame = 0
@@ -2184,7 +2185,7 @@ class TTLiveMonitor(Container):
         Binding("end", "scroll_end", "Go to Bottom", show=False),
     ]
 
-    def __init__(self, backend: TTSMIBackend, **kwargs):
+    def __init__(self, backend: Any  # JSONBackendAdapter or compatible, **kwargs):
         super().__init__(**kwargs)
         self.backend = backend
 
