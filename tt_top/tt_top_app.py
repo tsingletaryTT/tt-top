@@ -297,11 +297,11 @@ Architecture:
   and consumes its JSON telemetry output. This provides clean separation
   between data acquisition (tt-smi) and visualization (tt-top).
 
-  Data flow: tt-smi -s → JSON stream → tt-top → visualization
+  Data flow: tt-smi -s -f <file> → JSON snapshot → tt-top reads file → visualization
 
 Requirements:
   - tt-smi must be installed and accessible in PATH (or via --tt-smi-path)
-  - tt-smi must support -s flag for JSON output
+  - tt-smi must support -s and -f flags for JSON snapshot output
 
 For more information, visit: https://github.com/tenstorrent/tt-top
         """,
@@ -381,18 +381,16 @@ def tt_top_main() -> int:
             logger.info(f"tt-smi path: {args.tt_smi_path}")
 
             try:
-                # Build tt-smi command with appropriate flags
-                tt_smi_cmd = f"{args.tt_smi_path} -s"
+                # JSONBackendAdapter will add -s -f <file> flags automatically
+                logger.info(f"Using tt-smi at: {args.tt_smi_path}")
 
-                # Add device filtering if specified
+                # Create JSON backend adapter with base tt-smi command
+                backend = JSONBackendAdapter(tt_smi_command=args.tt_smi_path)
+
+                # Device filtering will be added in future implementation
                 if args.device is not None:
-                    tt_smi_cmd += f" --device {args.device}"
-                    logger.info(f"Filtering to device {args.device}")
-
-                logger.info(f"Spawning: {tt_smi_cmd}")
-
-                # Create JSON backend adapter
-                backend = JSONBackendAdapter(tt_smi_command=tt_smi_cmd)
+                    logger.warning("Device filtering not yet implemented in file-based mode")
+                    logger.info(f"Requested device: {args.device}")
 
                 # Wait for initial telemetry data
                 import time
@@ -408,7 +406,7 @@ def tt_top_main() -> int:
                     logger.error("Troubleshooting:")
                     logger.error("  1. Ensure tt-smi is installed: which tt-smi")
                     logger.error("  2. Test tt-smi directly: tt-smi -s")
-                    logger.error("  3. Check tt-smi supports continuous mode: tt-smi --help")
+                    logger.error("  3. Test file output: tt-smi -s -f /tmp/test.json")
                     logger.error("  4. Try mock mode for testing: tt-top --mock")
                     logger.error("")
                     return 1
@@ -419,11 +417,11 @@ def tt_top_main() -> int:
                     logger.info(f"  Device {i}: {device.get_architecture_name()} ({device.board_type})")
 
             except RuntimeError as e:
-                logger.error(f"Failed to spawn tt-smi subprocess: {e}")
+                logger.error(f"Failed to run tt-smi: {e}")
                 logger.error("")
                 logger.error("Possible causes:")
                 logger.error("  - tt-smi not installed or not in PATH")
-                logger.error("  - tt-smi does not support -s flag for JSON output")
+                logger.error("  - tt-smi does not support -s -f flags for snapshot output")
                 logger.error("")
                 logger.error("Solutions:")
                 logger.error("  - Install tt-smi from Tenstorrent tools")

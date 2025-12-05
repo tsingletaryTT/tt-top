@@ -9,11 +9,11 @@ instead of accessing hardware directly. This follows the UNIX philosophy of
 composable tools with clean data interfaces.
 
 Architecture:
-    tt-smi -s (subprocess)
+    tt-smi -s -f <file> (one-shot command)
         ↓
-    JSON stream to stdout
+    JSON snapshot written to file
         ↓
-    JSONBackendAdapter (parse & cache)
+    JSONBackendAdapter (read file, parse & cache)
         ↓
     Widgets (same interface as TTSMIBackend)
 """
@@ -22,6 +22,8 @@ import json
 import subprocess
 import time
 import logging
+import os
+import tempfile
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 
@@ -120,7 +122,7 @@ class JSONBackendAdapter:
 
     def __init__(
         self,
-        tt_smi_command: str = "tt-smi -s",
+        tt_smi_command: str = "tt-smi",
         mock_mode: bool = False,
         mock_json_file: Optional[str] = None,
     ):
@@ -128,17 +130,18 @@ class JSONBackendAdapter:
         Initialize JSON backend adapter
 
         Args:
-            tt_smi_command: Command to spawn tt-smi (default: "tt-smi -s")
-            mock_mode: If True, use mock data instead of subprocess
+            tt_smi_command: Base tt-smi command (default: "tt-smi")
+            mock_mode: If True, use mock data instead of running tt-smi
             mock_json_file: Path to JSON file for mock mode
         """
         self.tt_smi_command = tt_smi_command
         self.mock_mode = mock_mode
         self.mock_json_file = mock_json_file
 
-        # Subprocess management
-        self.process: Optional[subprocess.Popen] = None
-        self.subprocess_running = False
+        # Snapshot file management
+        self.snapshot_file = tempfile.mktemp(suffix=".json", prefix="tt_top_snapshot_")
+        self.last_command_time = 0.0
+        self.min_command_interval = 0.1  # Minimum 100ms between tt-smi calls
 
         # Safety coordinator for adaptive polling
         self.safety_coordinator = JSONSafetyCoordinator()
@@ -160,8 +163,8 @@ class JSONBackendAdapter:
         """
         Initialize backend adapter
 
-        Spawns tt-smi subprocess in continuous JSON mode, or loads mock data
-        if in mock mode. Performs initial data read to populate device list.
+        Loads mock data if in mock mode, or performs initial tt-smi call
+        to populate device list.
         """
         if self.mock_mode:
             logger.info("Initializing in mock mode")
@@ -170,110 +173,84 @@ class JSONBackendAdapter:
             else:
                 self._generate_mock_data()
         else:
-            logger.info(f"Spawning tt-smi subprocess: {self.tt_smi_command}")
-            self._spawn_subprocess()
-            # Perform initial read to populate device list
+            logger.info(f"Initializing with tt-smi command: {self.tt_smi_command}")
+            # Perform initial tt-smi call to populate device list
             self.update_telem()
 
-    def _spawn_subprocess(self) -> None:
+    def _run_tt_smi_snapshot(self) -> bool:
         """
-        Spawn tt-smi subprocess for continuous JSON output
+        Run tt-smi command to generate JSON snapshot file
 
-        Configures subprocess with:
-        - stdout capture for JSON streaming
-        - stderr capture for error logging
-        - Line-buffered output for real-time reads
+        Returns:
+            bool: True if snapshot was generated successfully, False otherwise
         """
+        # Rate limiting
+        current_time = time.time()
+        if current_time - self.last_command_time < self.min_command_interval:
+            return False
+
         try:
-            # Split command string into args
-            cmd_args = self.tt_smi_command.split()
+            # Build command: tt-smi -s -f <snapshot_file>
+            cmd_args = [self.tt_smi_command, '-s', '-f', self.snapshot_file]
 
-            # Spawn subprocess with stdout/stderr capture
-            self.process = subprocess.Popen(
+            # Run tt-smi command and wait for completion
+            result = subprocess.run(
                 cmd_args,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 text=True,
-                bufsize=1,  # Line-buffered
+                timeout=5.0  # 5 second timeout
             )
 
-            self.subprocess_running = True
-            logger.info(f"tt-smi subprocess spawned with PID {self.process.pid}")
+            self.last_command_time = current_time
 
-        except FileNotFoundError as e:
+            if result.returncode != 0:
+                logger.error(f"tt-smi command failed with code {result.returncode}")
+                if result.stderr:
+                    logger.error(f"stderr: {result.stderr}")
+                return False
+
+            # Check that snapshot file was created
+            if not os.path.exists(self.snapshot_file):
+                logger.error(f"tt-smi did not create snapshot file: {self.snapshot_file}")
+                return False
+
+            return True
+
+        except FileNotFoundError:
             logger.error(f"tt-smi command not found: {self.tt_smi_command}")
             logger.error("Please ensure tt-smi is installed and in PATH")
-            raise RuntimeError("tt-smi not found") from e
+            return False
+
+        except subprocess.TimeoutExpired:
+            logger.error("tt-smi command timed out after 5 seconds")
+            return False
 
         except Exception as e:
-            logger.error(f"Failed to spawn tt-smi subprocess: {e}")
-            raise
-
-    def _restart_subprocess(self) -> None:
-        """
-        Restart tt-smi subprocess after crash or error
-
-        Performs cleanup of old process, waits briefly, then spawns new process.
-        """
-        logger.warning("Restarting tt-smi subprocess")
-
-        # Cleanup old process
-        if self.process:
-            try:
-                self.process.terminate()
-                self.process.wait(timeout=2.0)
-            except subprocess.TimeoutExpired:
-                self.process.kill()
-            except Exception as e:
-                logger.error(f"Error cleaning up old subprocess: {e}")
-
-        # Wait before restart
-        time.sleep(0.5)
-
-        # Spawn new process
-        try:
-            self._spawn_subprocess()
-            logger.info("Subprocess restarted successfully")
-        except Exception as e:
-            logger.error(f"Failed to restart subprocess: {e}")
-            self.subprocess_running = False
+            logger.error(f"Failed to run tt-smi command: {e}")
+            return False
 
     def update_telem(self) -> None:
         """
         Update telemetry data from tt-smi JSON output
 
-        Reads next line of JSON from subprocess stdout, parses it,
-        and updates cached data structures. Handles errors gracefully
-        with automatic subprocess restart.
+        Runs tt-smi to generate snapshot file, reads and parses JSON,
+        and updates cached data structures. Handles errors gracefully.
         """
         if self.mock_mode:
             # In mock mode, just refresh the mock data
             self._refresh_mock_data()
             return
 
-        # Check subprocess health
-        if not self.subprocess_running or not self.process:
-            logger.error("Subprocess not running, attempting restart")
-            self.safety_coordinator.report_json_error()
-            self._restart_subprocess()
-            return
-
         try:
-            # Read next line of JSON from stdout
-            json_line = self.process.stdout.readline()
-
-            if not json_line:
-                # Empty read - subprocess may have died
-                logger.warning("Empty read from subprocess, checking health")
-                if self.process.poll() is not None:
-                    # Process has terminated
-                    logger.error(f"Subprocess terminated with code {self.process.returncode}")
-                    self.safety_coordinator.report_json_error()
-                    self._restart_subprocess()
+            # Run tt-smi to generate snapshot
+            if not self._run_tt_smi_snapshot():
+                logger.warning("Failed to generate tt-smi snapshot")
+                self.safety_coordinator.report_json_error()
                 return
 
-            # Parse JSON
-            json_data = json.loads(json_line)
+            # Read JSON from snapshot file
+            with open(self.snapshot_file, 'r') as f:
+                json_data = json.load(f)
 
             # Parse into Pydantic model
             log = TTSMILog(**json_data)
@@ -285,9 +262,14 @@ class JSONBackendAdapter:
             self.safety_coordinator.report_json_success()
             self._last_update_time = time.time()
 
+            # Clean up snapshot file
+            try:
+                os.remove(self.snapshot_file)
+            except Exception as e:
+                logger.debug(f"Could not remove snapshot file: {e}")
+
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse JSON: {e}")
-            logger.debug(f"Malformed JSON line: {json_line[:200]}")
+            logger.error(f"Failed to parse JSON from snapshot: {e}")
             self.safety_coordinator.report_json_error()
 
         except Exception as e:
