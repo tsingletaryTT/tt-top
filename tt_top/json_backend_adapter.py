@@ -9,7 +9,7 @@ instead of accessing hardware directly. This follows the UNIX philosophy of
 composable tools with clean data interfaces.
 
 Architecture:
-    tt-smi -s -f <file> (one-shot command)
+    tt-smi -f <file> (one-shot command)
         ↓
     JSON snapshot written to file
         ↓
@@ -190,8 +190,8 @@ class JSONBackendAdapter:
             return False
 
         try:
-            # Build command: tt-smi -s -f <snapshot_file>
-            cmd_args = [self.tt_smi_command, '-s', '-f', self.snapshot_file]
+            # Build command: tt-smi -f <snapshot_file>
+            cmd_args = [self.tt_smi_command, '-f', self.snapshot_file]
 
             # Run tt-smi command and wait for completion
             result = subprocess.run(

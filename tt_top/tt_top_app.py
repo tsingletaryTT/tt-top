@@ -297,11 +297,11 @@ Architecture:
   and consumes its JSON telemetry output. This provides clean separation
   between data acquisition (tt-smi) and visualization (tt-top).
 
-  Data flow: tt-smi -s -f <file> → JSON snapshot → tt-top reads file → visualization
+  Data flow: tt-smi -f <file> → JSON snapshot → tt-top reads file → visualization
 
 Requirements:
   - tt-smi must be installed and accessible in PATH (or via --tt-smi-path)
-  - tt-smi must support -s and -f flags for JSON snapshot output
+  - tt-smi must support -f flag for JSON snapshot output
 
 For more information, visit: https://github.com/tenstorrent/tt-top
         """,
@@ -405,8 +405,8 @@ def tt_top_main() -> int:
                     logger.error("")
                     logger.error("Troubleshooting:")
                     logger.error("  1. Ensure tt-smi is installed: which tt-smi")
-                    logger.error("  2. Test tt-smi directly: tt-smi -s")
-                    logger.error("  3. Test file output: tt-smi -s -f /tmp/test.json")
+                    logger.error("  2. Test tt-smi directly: tt-smi")
+                    logger.error("  3. Test file output: tt-smi -f /tmp/test.json")
                     logger.error("  4. Try mock mode for testing: tt-top --mock")
                     logger.error("")
                     return 1
@@ -421,7 +421,7 @@ def tt_top_main() -> int:
                 logger.error("")
                 logger.error("Possible causes:")
                 logger.error("  - tt-smi not installed or not in PATH")
-                logger.error("  - tt-smi does not support -s -f flags for snapshot output")
+                logger.error("  - tt-smi does not support -f flag for snapshot output")
                 logger.error("")
                 logger.error("Solutions:")
                 logger.error("  - Install tt-smi from Tenstorrent tools")
