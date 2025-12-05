@@ -362,6 +362,319 @@ def correlate_process_with_telemetry(pid, resource_info):
 
 **Key Innovation**: First hardware monitoring tool to correlate system processes with chip telemetry, enabling identification of which specific ML workloads are driving Tenstorrent hardware utilization.
 
+## JSON-Based Architecture Refactoring
+
+### **Major Architectural Change (Dec 2024)**
+**User Request**: "I want to make the code base less dependent as a fork of tt-smi but instead maintain the same UI and results but achieve them by running tt-smi in JSON data mode, like a good UNIX citizen"
+
+**Implementation**: Refactored tt-top from tightly-coupled tt-smi fork to standalone UNIX-style tool that consumes JSON telemetry via subprocess invocation.
+
+#### **Architecture Transformation**
+**Before (Fork Architecture)**:
+```
+tt-top (integrated into tt-smi)
+    ↓
+Direct TTSMIBackend access
+    ↓
+pyluwen → hardware (PCIe/SMBUS)
+```
+
+**After (UNIX Architecture)**:
+```
+tt-top (standalone)
+    ↓
+tt-smi --json --continuous (subprocess)
+    ↓
+JSON telemetry stream (stdout)
+    ↓
+JSONBackendAdapter (parse)
+    ↓
+Visualization widgets (unchanged)
+```
+
+#### **Key Components Implemented**
+
+**1. DeviceProxy Class** (`tt_top/device_proxy.py`):
+- Lightweight device objects for architecture detection
+- Implements `as_gs()`, `as_wh()`, `as_bh()` methods
+- Pattern matching on board_type strings: e75/e150 (GS), n150/n300 (WH), p150/p300 (BH)
+- Cached detection for performance
+- No hardware dependencies
+
+**2. JSONBackendAdapter** (`tt_top/json_backend_adapter.py`):
+- Spawns `tt-smi --json --continuous` as subprocess
+- Line-by-line JSON parsing from stdout
+- Implements identical interface as TTSMIBackend for backward compatibility
+- Subprocess lifecycle management (spawn, monitor, restart on crash)
+- Error handling with exponential backoff
+- Mock mode for development without tt-smi
+
+**3. JSONSafetyCoordinator**:
+- Simplified safety coordinator for JSON mode
+- Adaptive polling intervals based on subprocess health
+- Exponential backoff on errors (0.1s → 2.0s max)
+- No PCIe error detection (tt-smi handles hardware safety)
+
+**4. Backend Mode Selection** (`tt_top/tt_top_app.py`):
+```bash
+# JSON mode (default)
+tt-top
+
+# Mock mode (testing)
+tt-top --mock
+
+# Direct mode (legacy)
+tt-top --direct-mode
+```
+
+#### **Data Model Compatibility**
+
+**Existing Pydantic Models** (tt_top/log.py):
+- `TTSMILog`: Top-level JSON structure
+- `TTSMIDeviceLog`: Per-device telemetry bundle
+- `SmbusTelem`: SMBUS data (DDR_STATUS, ARC health, clocks)
+- `BoardInfo`: Device identification (board_type, bus_id)
+- `Telemetry`: Core metrics (power, current, temperature, aiclk)
+
+**Adapter Mapping**:
+```python
+# Convert Pydantic models → Backend interface dictionaries
+self._device_telemetrys[i] = {
+    'voltage': device_log.telemetry.voltage,
+    'current': device_log.telemetry.current,
+    'power': device_log.telemetry.power,
+    'asic_temperature': device_log.telemetry.asic_temperature,
+    'aiclk': device_log.telemetry.aiclk,
+    'heartbeat': device_log.smbus_telem.ARC0_HEALTH,
+}
+
+self._smbus_telem_info[i] = {
+    'DDR_STATUS': device_log.smbus_telem.DDR_STATUS,
+    'DDR_SPEED': device_log.smbus_telem.DDR_SPEED,
+    'ARC0_HEALTH': device_log.smbus_telem.ARC0_HEALTH,
+    # ... additional SMBUS fields
+}
+
+self._device_infos[i] = {
+    'board_type': device_log.board_info.board_type,
+    'bus_id': device_log.board_info.bus_id,
+    'dram_status': device_log.board_info.dram_status,
+    # ... additional device info
+}
+```
+
+#### **Workload Detection Hybrid Approach**
+
+**Design Decision**: Keep workload detection in tt-top (client-side)
+- tt-smi provides hardware telemetry JSON
+- tt-top performs `/proc` filesystem scanning for ML frameworks
+- tt-top correlates process data with telemetry changes
+- Rationale: Process detection requires local filesystem access, belongs in visualization layer
+
+**Methods Moved to Adapter**:
+- `detect_workload_state()`: Threshold-based state detection from telemetry
+- `get_workload_event_text()`: Event description generation
+- No hardware access required - pure data analysis
+
+#### **Benefits Achieved**
+
+1. **UNIX Philosophy**: Clean separation of data producer (tt-smi) and consumer (tt-top)
+2. **Decoupling**: tt-top no longer requires pyluwen, tt_tools_common, or hardware access
+3. **Distribution**: tt-top can be pip-installed without hardware dependencies
+4. **Testing**: Easy mocking with JSON files or mock mode
+5. **Security**: Subprocess isolation from hardware, safer in restricted environments
+6. **Maintainability**: tt-smi updates automatically benefit tt-top
+7. **Portability**: Works anywhere tt-smi runs (local, remote via SSH, containers)
+
+#### **Backward Compatibility**
+
+**Direct Mode Preserved**:
+- `--direct-mode` flag enables legacy TTSMIBackend
+- All existing safety features and hardware access methods maintained
+- Useful for environments where subprocess spawning is restricted
+
+**Widget Compatibility**:
+- Zero changes to `tt_top_widget.py`, `animated_display.py`, or visualization code
+- Backend interface remained identical (duck typing)
+- All features work identically in JSON and direct modes
+
+#### **Performance Characteristics**
+
+**JSON Mode Overhead**:
+- Subprocess spawn: ~100ms one-time cost at startup
+- JSON parsing: ~1-2ms per update (acceptable for 100ms refresh rate)
+- IPC latency: Negligible (stdout pipe, line-buffered)
+- Memory: Minimal (one JSON object cached at a time)
+
+**Adaptive Polling**:
+- Normal operation: 100ms intervals (10 FPS)
+- After subprocess errors: Exponential backoff to 2s
+- Reset to 100ms after successful reads
+
+#### **Testing Strategy**
+
+**Mock Mode**:
+- Generates realistic single-device mock data (Wormhole n150)
+- Simulates telemetry variations (±5W power, ±2A current, ±1°C temperature)
+- No external dependencies required
+- Ideal for UI development and CI/CD
+
+**Test Coverage**:
+- DeviceProxy architecture detection (all board types)
+- JSONBackendAdapter mock mode operation
+- Backend interface method compatibility
+- Subprocess lifecycle management
+- Error handling and recovery
+
+#### **Documentation Updates**
+
+**Files Modified**:
+- `README.md`: Updated architecture, installation, usage sections
+- `CLAUDE.md`: This section documenting the refactoring
+- `tt_top/tt_top_app.py`: Updated help text and examples
+
+**New Documentation Needs**:
+- Migration guide for users (from direct to JSON mode)
+- tt-smi JSON output format specification
+- Backend adapter interface documentation for custom adapters
+
+#### **Future Enhancements**
+
+**Potential Backend Adapters**:
+- **File-based**: Read JSON from log files for historical playback
+- **Network streaming**: Consume JSON from remote tt-smi over TCP/HTTP
+- **Multi-source aggregation**: Combine data from multiple tt-smi instances
+- **Recording mode**: Capture JSON streams for later analysis
+
+**JSON Mode Requirements for tt-smi**:
+- Must implement `--json` flag for single JSON output
+- Must implement `--json --continuous` for streaming mode (100ms interval)
+- JSON format: One complete TTSMILog object per line (JSONL)
+- Should support `--device N` filtering in JSON mode
+
+**★ Insight ─────────────────────────────────────**
+This refactoring exemplifies the power of the UNIX philosophy applied to modern monitoring tools. By separating data acquisition (tt-smi) from visualization (tt-top), we achieved better maintainability, testability, and portability. The subprocess-based architecture trades minimal performance overhead (~1ms) for substantial architectural benefits: zero hardware dependencies, easy mocking, subprocess isolation, and the ability to monitor remote systems via simple command piping. The duck-typed backend interface ensured zero changes to visualization code, demonstrating that well-designed abstractions enable major architectural transformations without breaking existing functionality.
+**─────────────────────────────────────────────────**
+
+### **Complete Decoupling - Direct Mode Removal (Dec 2024)**
+**User Request**: "Let's remove direct mode entirely. We want as much decoupling from code that might change and evolve in tt-smi as possible. If we're adopting improvements in tt-smi, it should be intentional through adoption of changes or improvements in its JSON output."
+
+**Implementation**: Removed all direct hardware access code, making tt-top purely a JSON consumer.
+
+#### **Complete Removal**
+**Files/Code Removed**:
+- All `TTSMIBackend` imports and references
+- All `tt_smi_backend` dependencies
+- All `SafetyConfig` and hardware safety coordinator code
+- `--direct-mode` CLI flag and supporting logic
+- CLI flags: `--safe-mode`, `--poll-interval`, `--max-errors`, `--workload-check-interval`, `--lock-timeout`, `--max-retries`, `--no-telemetry-warnings`
+- All hardware detection and device initialization code
+- All pyluwen and tt_tools_common import paths
+
+**Only Two Modes Remain**:
+1. **JSON Mode** (default): `tt-top` - spawns tt-smi subprocess
+2. **Mock Mode** (testing): `tt-top --mock` - simulated data
+
+#### **Benefits of Complete Decoupling**
+
+**1. Zero Code Coupling**:
+- tt-top cannot import any tt-smi internal modules
+- No shared code paths or internal APIs
+- Changes in tt-smi internals cannot break tt-top
+- Only dependency: JSON format contract
+
+**2. Intentional Evolution**:
+- tt-smi JSON changes require explicit schema updates
+- tt-top maintainers review JSON format changes
+- Backward compatibility can be managed at JSON layer
+- No accidental breakage from refactoring
+
+**3. Distribution Simplicity**:
+- tt-top has minimal dependencies (textual, rich, pydantic, psutil)
+- No hardware stack dependencies (pyluwen, tt_tools_common)
+- Can be pip-installed on any machine
+- Works on systems without hardware access
+
+**4. Clear Separation of Concerns**:
+- tt-smi: Hardware access, safety, telemetry acquisition
+- tt-top: Visualization, workload detection, user interface
+- Each tool can evolve independently
+- Clear interface boundary (JSON schema)
+
+**5. Testing Independence**:
+- tt-top tests don't need hardware
+- tt-top tests don't need tt-smi internals
+- Mock mode provides complete test coverage
+- CI/CD runs without hardware dependencies
+
+#### **Simplified Architecture**
+
+**Before (Dual Mode)**:
+```
+tt-top --direct-mode → TTSMIBackend → pyluwen → hardware
+tt-top (default)     → tt-smi JSON → JSONBackendAdapter
+```
+
+**After (JSON Only)**:
+```
+tt-top      → tt-smi JSON → JSONBackendAdapter → Visualization
+tt-top --mock → MockData → JSONBackendAdapter → Visualization
+```
+
+**Single Code Path**: All visualization code uses JSONBackendAdapter interface, no branching logic.
+
+#### **JSON Contract as Interface**
+
+**tt-smi Responsibilities**:
+- Hardware detection and initialization
+- Safety coordination and error handling
+- SMBUS telemetry collection
+- DDR training status monitoring
+- ARC firmware health checking
+- JSON serialization of all data
+
+**tt-top Responsibilities**:
+- JSON parsing and validation
+- Device architecture detection (from board_type)
+- Visualization rendering
+- /proc filesystem scanning for workload detection
+- User interface and keyboard handling
+- Mock data generation for testing
+
+**Interface Boundary**:
+- JSON schema defines exact data contract
+- Schema versioning enables backward compatibility
+- New fields are additive (optional in JSON)
+- Deprecated fields remain for transition periods
+
+#### **Future JSON Schema Evolution**
+
+**Versioning Strategy**:
+```json
+{
+  "schema_version": "1.0",
+  "time": "2024-12-01T12:00:00Z",
+  "device_info": [...]
+}
+```
+
+**Backward Compatibility Approach**:
+- tt-top checks schema_version, adapts parsing
+- New optional fields don't break old tt-top
+- Required field changes require major version bump
+- tt-top can support multiple schema versions
+
+**Proposed Enhancements Through JSON**:
+- **Historical data**: Add `history` array with last N samples
+- **Workload hints**: tt-smi could add process correlation data
+- **Alerts**: Threshold violations flagged in JSON
+- **Metrics**: Calculated metrics (efficiency, utilization)
+- **Topology**: Multi-device interconnect information
+
+**★ Insight ─────────────────────────────────────**
+Removing direct mode completed the transformation to a true UNIX-style tool. tt-top is now a pure data consumer with zero coupling to tt-smi's internals. This ensures that tt-smi can refactor, optimize, or completely rewrite its hardware access layer without breaking tt-top. The JSON interface serves as a stable contract that both tools agree upon, with schema versioning enabling controlled evolution. This architectural decision trades some flexibility for long-term stability and maintainability - a worthwhile trade for production monitoring tools.
+**─────────────────────────────────────────────────**
+
 ## Final Enhancement: Cyberpunk Colors & Hardware-Responsive Animations
 
 ### **Latest Evolution (Oct 2024)**

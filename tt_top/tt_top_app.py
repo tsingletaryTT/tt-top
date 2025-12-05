@@ -21,7 +21,7 @@ from textual.binding import Binding
 from textual.containers import Container
 from textual.widgets import Footer
 
-from tt_top.tt_smi_backend import TTSMIBackend
+from tt_top.json_backend_adapter import JSONBackendAdapter
 from tt_top.tt_top_widget import TTLiveMonitor
 from tt_top.animated_display import HardwareResponsiveASCII
 from tt_top.simple_animated_display import SimpleHardwareDisplay
@@ -98,11 +98,11 @@ class TTTopApp(App[None]):
         Binding("end", "scroll_end", "End", show=False),
     ]
 
-    def __init__(self, backend: TTSMIBackend, **kwargs) -> None:
-        """Initialize TT-Top application with hardware backend
+    def __init__(self, backend: JSONBackendAdapter, **kwargs) -> None:
+        """Initialize TT-Top application with JSON backend
 
         Args:
-            backend: TTSMIBackend instance for device communication
+            backend: JSONBackendAdapter instance for device communication
             **kwargs: Additional arguments passed to parent App
         """
         super().__init__(**kwargs)
@@ -139,6 +139,9 @@ class TTTopApp(App[None]):
     def action_quit(self) -> None:
         """Handle quit action"""
         logger.info("TT-Top application shutting down")
+        # Cleanup backend resources if using JSON adapter
+        if hasattr(self.backend, 'cleanup'):
+            self.backend.cleanup()
         self.exit()
 
     def action_toggle_visualization(self) -> None:
@@ -279,19 +282,26 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  tt-top                              # Start live monitoring with auto safety
+  # Standard Usage (requires tt-smi installed):
+  tt-top                              # Start monitoring (spawns tt-smi)
   tt-top --device 0                   # Monitor specific device
-  tt-top --safe-mode on               # Force safe polling (2s intervals)
-  tt-top --safe-mode off              # Disable safety (may interfere with workloads)
-  tt-top --poll-interval 0.5          # Custom 500ms polling (overrides safety)
-  tt-top --max-errors 5               # Allow 5 PCIe errors before disabling
-  tt-top --workload-check-interval 2  # Check for ML workloads every 2 seconds
+  tt-top --tt-smi-path /path/to/tt-smi  # Use custom tt-smi location
   tt-top --log-level DEBUG            # Enable debug logging
 
-Safety Modes:
-  auto (default) - Automatically detect workloads and adjust polling
-  on             - Force safe polling intervals (2s) regardless of workloads
-  off            - Use fast polling (100ms) - WARNING: may cause PCIe errors
+  # Mock Mode (for testing without hardware):
+  tt-top --mock                       # Use simulated mock data
+  tt-top --mock --log-level DEBUG     # Mock mode with debug logging
+
+Architecture:
+  tt-top is a standalone UNIX-style tool that spawns tt-smi as a subprocess
+  and consumes its JSON telemetry output. This provides clean separation
+  between data acquisition (tt-smi) and visualization (tt-top).
+
+  Data flow: tt-smi -f <file> → JSON snapshot → tt-top reads file → visualization
+
+Requirements:
+  - tt-smi must be installed and accessible in PATH (or via --tt-smi-path)
+  - tt-smi must support -f flag for JSON snapshot output
 
 For more information, visit: https://github.com/tenstorrent/tt-top
         """,
@@ -314,59 +324,19 @@ For more information, visit: https://github.com/tenstorrent/tt-top
         help="Set logging level (default: INFO)",
     )
 
-    # Hardware safety options
-    parser.add_argument(
-        "--safe-mode",
-        choices=["auto", "on", "off"],
-        default="auto",
-        help="Hardware safety mode (auto: workload detection, on: force safe polling, off: disable safety)",
-    )
-
-    parser.add_argument(
-        "--poll-interval",
-        type=float,
-        default=None,
-        metavar="SECONDS",
-        help="Override polling interval in seconds (bypasses dynamic adjustment)",
-    )
-
-    parser.add_argument(
-        "--max-errors",
-        type=int,
-        default=3,
-        metavar="COUNT",
-        help="Maximum PCIe errors before disabling monitoring (default: 3)",
-    )
-
-    parser.add_argument(
-        "--workload-check-interval",
-        type=float,
-        default=1.0,
-        metavar="SECONDS",
-        help="How often to check for active workloads in seconds (default: 1.0)",
-    )
-
-    parser.add_argument(
-        "--lock-timeout",
-        type=float,
-        default=1.0,
-        metavar="SECONDS",
-        help="Maximum time to wait for hardware access lock in seconds (default: 1.0)",
-    )
-
-    parser.add_argument(
-        "--max-retries",
-        type=int,
-        default=3,
-        metavar="COUNT",
-        help="Maximum telemetry read retry attempts with exponential backoff (default: 3)",
-    )
-
     # Backend options
     parser.add_argument(
-        "--no-telemetry-warnings",
+        "--tt-smi-path",
+        type=str,
+        default="tt-smi",
+        metavar="PATH",
+        help="Path to tt-smi executable (default: 'tt-smi' from PATH)",
+    )
+
+    parser.add_argument(
+        "--mock",
         action="store_true",
-        help="Suppress telemetry warnings for unsupported features",
+        help="Use mock data mode (for testing without tt-smi or hardware)",
     )
 
     # Version information
@@ -382,7 +352,7 @@ For more information, visit: https://github.com/tenstorrent/tt-top
 def tt_top_main() -> int:
     """Main entry point for TT-Top application
 
-    Sets up logging, initializes the hardware backend, and launches
+    Sets up logging, initializes the JSON backend adapter, and launches
     the real-time monitoring interface.
 
     Returns:
@@ -398,69 +368,70 @@ def tt_top_main() -> int:
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
 
-        # Initialize backend with device detection
-        logger.info("Initializing TT-Top hardware monitoring")
+        # Determine backend mode (JSON or mock)
+        if args.mock:
+            # Mock mode: Use simulated data for testing
+            logger.info("Starting in MOCK mode (simulated data)")
+            backend = JSONBackendAdapter(mock_mode=True)
+            logger.info(f"Generated mock data for {len(backend.devices)} device(s)")
 
-        # Import the device detection functionality
-        try:
-            from tt_top.tt_smi_backend import detect_chips_with_callback, HARDWARE_AVAILABLE
-            if HARDWARE_AVAILABLE:
-                logger.info("Detecting Tenstorrent devices...")
-                devices = detect_chips_with_callback(print_status=False)
-                if not devices:
-                    logger.warning("No Tenstorrent devices detected")
+        else:
+            # JSON mode: Spawn tt-smi subprocess and consume JSON
+            logger.info("Starting in JSON mode (tt-smi subprocess)")
+            logger.info(f"tt-smi path: {args.tt_smi_path}")
+
+            try:
+                # JSONBackendAdapter will add -s -f <file> flags automatically
+                logger.info(f"Using tt-smi at: {args.tt_smi_path}")
+
+                # Create JSON backend adapter with base tt-smi command
+                backend = JSONBackendAdapter(tt_smi_command=args.tt_smi_path)
+
+                # Device filtering will be added in future implementation
+                if args.device is not None:
+                    logger.warning("Device filtering not yet implemented in file-based mode")
+                    logger.info(f"Requested device: {args.device}")
+
+                # Wait for initial telemetry data
+                import time
+                max_wait = 5.0
+                start_time = time.time()
+                while not backend.devices and (time.time() - start_time) < max_wait:
+                    backend.update_telem()
+                    time.sleep(0.1)
+
+                if not backend.devices:
+                    logger.error("Failed to receive telemetry from tt-smi")
+                    logger.error("")
+                    logger.error("Troubleshooting:")
+                    logger.error("  1. Ensure tt-smi is installed: which tt-smi")
+                    logger.error("  2. Test tt-smi directly: tt-smi")
+                    logger.error("  3. Test file output: tt-smi -f /tmp/test.json")
+                    logger.error("  4. Try mock mode for testing: tt-top --mock")
+                    logger.error("")
                     return 1
-                logger.info(f"Found {len(devices)} Tenstorrent device(s)")
-            else:
-                logger.info("Using mock hardware for development")
-                from tt_top.mock_hardware import MockPciChip
-                devices = [MockPciChip(i) for i in range(1)]  # Create one mock device
-        except Exception as e:
-            logger.error(f"Failed to detect devices: {e}")
-            return 1
 
-        # Apply device filtering if specified
-        if args.device is not None:
-            if args.device >= len(devices):
-                logger.error(f"Device {args.device} not found. Available devices: 0-{len(devices)-1}")
+                logger.info(f"Successfully connected to tt-smi")
+                logger.info(f"Detected {len(backend.devices)} device(s)")
+                for i, device in enumerate(backend.devices):
+                    logger.info(f"  Device {i}: {device.get_architecture_name()} ({device.board_type})")
+
+            except RuntimeError as e:
+                logger.error(f"Failed to run tt-smi: {e}")
+                logger.error("")
+                logger.error("Possible causes:")
+                logger.error("  - tt-smi not installed or not in PATH")
+                logger.error("  - tt-smi does not support -f flag for snapshot output")
+                logger.error("")
+                logger.error("Solutions:")
+                logger.error("  - Install tt-smi from Tenstorrent tools")
+                logger.error("  - Use --tt-smi-path to specify custom location")
+                logger.error("  - Use --mock for testing without hardware")
+                logger.error("")
                 return 1
-            devices = [devices[args.device]]  # Filter to single device
-            logger.info(f"Monitoring device {args.device} only")
-
-        # Configure hardware safety based on CLI arguments
-        from tt_top.safety import SafetyConfig
-        safety_config = SafetyConfig(
-            max_errors_before_disable=args.max_errors,
-            workload_check_interval=args.workload_check_interval,
-            max_lock_wait_time=args.lock_timeout,
-            # Set polling intervals based on CLI arguments
-            normal_poll_interval=args.poll_interval if args.poll_interval else 0.1,
-            workload_poll_interval=args.poll_interval if args.poll_interval else 2.0,
-            critical_poll_interval=args.poll_interval if args.poll_interval else 5.0,
-        )
-
-        # Initialize backend with detected devices and safety configuration
-        backend = TTSMIBackend(devices=devices, fully_init=True, safety_config=safety_config)
-
-        # Configure retry behavior based on CLI arguments
-        backend.max_retries = args.max_retries
-
-        # Apply CLI safety mode overrides
-        if args.safe_mode == "on":
-            logger.info("Forcing hardware safety mode ON via --safe-mode")
-            backend.safety_coordinator.force_safety_mode(True)
-        elif args.safe_mode == "off":
-            logger.warning("Hardware safety mode DISABLED via --safe-mode - monitoring may interfere with workloads")
-            backend.safety_coordinator.force_safety_mode(False)
-        else:  # auto mode
-            logger.info("Hardware safety mode AUTO - will detect workloads automatically")
-
-        # Apply custom polling interval override if specified
-        if args.poll_interval:
-            logger.info(f"Using custom polling interval: {args.poll_interval}s (overrides dynamic adjustment)")
-            backend.safety_coordinator.set_custom_poll_interval(args.poll_interval)
 
         # Launch the TT-Top application
+        logger.info("Launching TT-Top visualization interface")
         app = TTTopApp(backend=backend)
         app.run()
 
@@ -472,6 +443,8 @@ def tt_top_main() -> int:
         return 0
     except Exception as e:
         logger.error(f"TT-Top failed with error: {e}")
+        import traceback
+        logger.debug(traceback.format_exc())
         return 1
 
 

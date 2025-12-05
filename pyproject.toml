@@ -24,15 +24,9 @@ classifiers = [
   "Topic :: System :: Monitoring",
 ]
 dependencies = [
-  'distro>=1.8.0',
-  'pydantic>=1.2',
-  'tt_tools_common==1.4.29',
-  'pyluwen==0.7.11',
+  'pydantic>=1.9.0',
   'rich>=13.7.0',
   'textual>=0.59.0',
-  'importlib_resources>=6.1.1',
-  'setuptools',
-  'tomli',
   'psutil>=5.9.0',
 ]
 

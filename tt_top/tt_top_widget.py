@@ -16,7 +16,8 @@ from textual.containers import Container, Vertical
 from textual.app import ComposeResult
 from textual.events import Key
 from textual.binding import Binding
-from tt_top.tt_smi_backend import TTSMIBackend
+# Backend interface - works with JSONBackendAdapter or any compatible backend
+from typing import Any
 from tt_top import constants
 
 # Cross-platform ScrollView import for Textual compatibility
@@ -39,7 +40,7 @@ class TTTopDisplay(Static):
     More compatible across Textual versions.
     """
 
-    def __init__(self, backend: TTSMIBackend, **kwargs):
+    def __init__(self, backend: Any, **kwargs):  # JSONBackendAdapter or compatible
         super().__init__(**kwargs)
         self.backend = backend
         self.animation_frame = 0
@@ -146,19 +147,27 @@ class TTTopDisplay(Static):
         return f"[{color}]{text}[/{color}]"
 
     def _get_status_indicator(self, power: float) -> tuple[str, str]:
-        """Get status block and icon based on power level - returns (block, icon)"""
-        if power > 50:
-            return (self._colorize_text("██████████", "bold red"),
+        """Get status block and icon based on power level - returns (block, icon) WITH VIBRANT COLORS"""
+        if power > 75:
+            # Ultra high power - pulsing red/orange
+            return (self._colorize_text("███████████", "bold red"),
                    self._colorize_text("◉", "bold red"))
+        elif power > 50:
+            # High power - bright orange
+            return (self._colorize_text("████████", "bold orange1") + self._colorize_text("██", "orange3"),
+                   self._colorize_text("◉", "bold orange1"))
         elif power > 25:
-            return (self._colorize_text("██████", "bold orange3") + self._colorize_text("▓▓▓▓", "dim white"),
-                   self._colorize_text("◎", "bold orange3"))
+            # Medium power - yellow to green gradient
+            return (self._colorize_text("██████", "bold yellow") + self._colorize_text("████", "bright_green"),
+                   self._colorize_text("◎", "bold yellow"))
         elif power > 10:
-            return (self._colorize_text("████", "bright_green") + self._colorize_text("▓▓▓▓▓▓", "dim white"),
-                   self._colorize_text("○", "bright_green"))
+            # Low power - cyan/green
+            return (self._colorize_text("████", "bright_cyan") + self._colorize_text("██████", "bright_blue"),
+                   self._colorize_text("○", "bright_cyan"))
         else:
-            return (self._colorize_text("▓▓▓▓▓▓▓▓▓▓", "dim white"),
-                   self._colorize_text("·", "dim white"))
+            # Idle - dim blue to purple gradient
+            return (self._colorize_text("▓▓▓▓▓", "blue") + self._colorize_text("▓▓▓▓▓", "magenta"),
+                   self._colorize_text("·", "blue"))
 
     def _get_device_status_text(self, device_idx: int) -> str:
         """Get intelligent device status text with appropriate colors"""
@@ -175,18 +184,34 @@ class TTTopDisplay(Static):
         return self._colorize_text(workload['name'], workload['color'])
 
     def _get_bandwidth_indicator(self, bandwidth: float) -> str:
-        """Get bandwidth utilization indicator with colors"""
-        if bandwidth > 50:
+        """Get bandwidth utilization indicator with VIBRANT RAINBOW COLORS"""
+        if bandwidth > 75:
+            # Ultra high bandwidth - pulsing red
             return (self._colorize_text("▓▓", "bold red") +
+                   self._colorize_text(f"{bandwidth:3.0f}", "bold red") + "  ")
+        elif bandwidth > 50:
+            # High bandwidth - bright orange
+            return (self._colorize_text("▓▓", "bold orange1") +
                    self._colorize_text(f"{bandwidth:3.0f}", "orange1") + "  ")
-        elif bandwidth > 25:
-            return (self._colorize_text("▒▒", "bold orange3") +
-                   self._colorize_text(f"{bandwidth:3.0f}", "bright_white") + "  ")
+        elif bandwidth > 35:
+            # Medium-high - yellow
+            return (self._colorize_text("▒▒", "bold yellow") +
+                   self._colorize_text(f"{bandwidth:3.0f}", "bold yellow") + "  ")
+        elif bandwidth > 20:
+            # Medium - green
+            return (self._colorize_text("▒▒", "bright_green") +
+                   self._colorize_text(f"{bandwidth:3.0f}", "bright_green") + "  ")
         elif bandwidth > 10:
-            return (self._colorize_text("░░", "bright_green") +
+            # Low-medium - cyan
+            return (self._colorize_text("░░", "bright_cyan") +
                    self._colorize_text(f"{bandwidth:3.0f}", "bright_cyan") + "  ")
+        elif bandwidth > 5:
+            # Low - blue
+            return (self._colorize_text("░░", "bright_blue") +
+                   self._colorize_text(f"{bandwidth:3.0f}", "bright_blue") + "  ")
         else:
-            return "  " + self._colorize_text(f"{bandwidth:3.0f}", "dim white") + "  "
+            # Very low - dim blue
+            return "  " + self._colorize_text(f"{bandwidth:3.0f}", "dim blue") + "  "
 
     def _get_event_color_and_text(self, device_idx: int, event_type: str) -> str:
         """Get intelligent event text using backend workload detection"""
@@ -253,15 +278,15 @@ class TTTopDisplay(Static):
         lines = []
         lines.append(self._create_section_header("MEMORY HIERARCHY MATRIX"))
 
-        # Add explanatory header with legend
+        # Add explanatory header with VIBRANT RAINBOW legend
         lines.append(self._create_bordered_line(
             self._colorize_text("Legend:", "bright_white") + " " +
             self._colorize_text("██", "bold red") + " >90% " +
-            self._colorize_text("▓▓", "orange3") + " 70-90% " +
-            self._colorize_text("▒▒", "orange1") + " 40-70% " +
+            self._colorize_text("▓▓", "bold orange1") + " 70-90% " +
+            self._colorize_text("▒▒", "bold yellow") + " 40-70% " +
             self._colorize_text("░░", "bright_green") + " 10-40% " +
-            self._colorize_text("··", "dim white") + " <10% " +
-            self._colorize_text("XX", "bold red") + " Error"
+            self._colorize_text("··", "bright_cyan") + " <10% " +
+            self._colorize_text("XX", "bold magenta") + " Error"
         ))
         lines.append(self._create_section_border())
 
@@ -343,16 +368,17 @@ class TTTopDisplay(Static):
             # Vary utilization per channel based on current and channel index
             channel_util = max(0, base_utilization - abs(i - num_channels//2))
 
+            # VIBRANT DDR CHANNEL COLORS - hot rainbow spectrum
             if channel_util >= 8:
                 channels.append(self._colorize_text("██", "bold red"))
             elif channel_util >= 6:
-                channels.append(self._colorize_text("▓▓", "orange3"))
+                channels.append(self._colorize_text("▓▓", "bold orange1"))
             elif channel_util >= 4:
-                channels.append(self._colorize_text("▒▒", "orange1"))
+                channels.append(self._colorize_text("▒▒", "bold yellow"))
             elif channel_util >= 2:
                 channels.append(self._colorize_text("░░", "bright_green"))
             else:
-                channels.append(self._colorize_text("··", "dim white"))
+                channels.append(self._colorize_text("··", "bright_cyan"))
 
         return " ".join(channels)
 
@@ -374,16 +400,17 @@ class TTTopDisplay(Static):
             elif i in [0, num_channels - 1]:  # Edge banks less active
                 bank_util = max(bank_util - 2, 0)
 
+            # VIBRANT L2 CACHE COLORS - cooler spectrum than DDR
             if bank_util >= 8:
-                cache_banks.append(self._colorize_text("██", "bold red"))
+                cache_banks.append(self._colorize_text("██", "bold magenta"))
             elif bank_util >= 6:
-                cache_banks.append(self._colorize_text("▓▓", "orange3"))
+                cache_banks.append(self._colorize_text("▓▓", "bright_magenta"))
             elif bank_util >= 4:
-                cache_banks.append(self._colorize_text("▒▒", "orange1"))
+                cache_banks.append(self._colorize_text("▒▒", "bright_blue"))
             elif bank_util >= 2:
-                cache_banks.append(self._colorize_text("░░", "bright_green"))
+                cache_banks.append(self._colorize_text("░░", "bright_cyan"))
             else:
-                cache_banks.append(self._colorize_text("··", "dim white"))
+                cache_banks.append(self._colorize_text("··", "cyan"))
 
         return " ".join(cache_banks)
 
@@ -415,16 +442,17 @@ class TTTopDisplay(Static):
                 activity += (self.animation_frame + r * display_cols + c) % 3 - 1
                 activity = max(0, min(activity, 9))
 
+                # VIBRANT L1 SRAM COLORS - warmest spectrum (closest to computation)
                 if activity >= 8:
                     row_chars.append(self._colorize_text("█", "bold red"))
                 elif activity >= 6:
-                    row_chars.append(self._colorize_text("▓", "orange3"))
+                    row_chars.append(self._colorize_text("▓", "bold orange1"))
                 elif activity >= 4:
-                    row_chars.append(self._colorize_text("▒", "orange1"))
+                    row_chars.append(self._colorize_text("▒", "bold yellow"))
                 elif activity >= 2:
-                    row_chars.append(self._colorize_text("░", "bright_green"))
+                    row_chars.append(self._colorize_text("░", "bright_yellow"))
                 else:
-                    row_chars.append(self._colorize_text("·", "dim white"))
+                    row_chars.append(self._colorize_text("·", "yellow"))
 
             # Format row with compression info
             if len(grid_lines) == 0:
@@ -449,38 +477,39 @@ class TTTopDisplay(Static):
         # Create flow visualization
         flow_chars = []
 
-        # DDR → L2 flow
+        # DDR → L2 flow with VIBRANT COLORS
         if ddr_to_l2_flow >= 7:
             flow_chars.extend([self._colorize_text("▶▶▶", "bold red")])
         elif ddr_to_l2_flow >= 5:
-            flow_chars.extend([self._colorize_text("▶▶▷", "orange3")])
+            flow_chars.extend([self._colorize_text("▶▶▷", "bold orange1")])
         elif ddr_to_l2_flow >= 3:
-            flow_chars.extend([self._colorize_text("▶▷▸", "orange1")])
+            flow_chars.extend([self._colorize_text("▶▷▸", "bold yellow")])
         elif ddr_to_l2_flow >= 1:
             flow_chars.extend([self._colorize_text("▷▸▹", "bright_green")])
         else:
-            flow_chars.extend([self._colorize_text("···", "dim white")])
+            flow_chars.extend([self._colorize_text("···", "bright_cyan")])
 
-        flow_chars.append(" → ")
+        flow_chars.append(self._colorize_text(" → ", "bright_white"))
 
-        # L2 → L1 flow
+        # L2 → L1 flow with VIBRANT COLORS
         if l2_to_l1_flow >= 7:
             flow_chars.extend([self._colorize_text("▶▶▶", "bold red")])
         elif l2_to_l1_flow >= 5:
-            flow_chars.extend([self._colorize_text("▶▶▷", "orange3")])
+            flow_chars.extend([self._colorize_text("▶▶▷", "bold orange1")])
         elif l2_to_l1_flow >= 3:
-            flow_chars.extend([self._colorize_text("▶▷▸", "orange1")])
+            flow_chars.extend([self._colorize_text("▶▷▸", "bold yellow")])
         elif l2_to_l1_flow >= 1:
-            flow_chars.extend([self._colorize_text("▷▸▹", "bright_green")])
+            flow_chars.extend([self._colorize_text("▷▸▹", "bright_cyan")])
         else:
-            flow_chars.extend([self._colorize_text("···", "dim white")])
+            flow_chars.extend([self._colorize_text("···", "bright_blue")])
 
-        # Add bandwidth estimates
+        # Add bandwidth estimates with VIBRANT COLORS
         ddr_bandwidth = current * 8.5  # Approximate GB/s calculation
         l1_bandwidth = power * 12.0   # Approximate internal bandwidth
 
         flow_chars.extend([
-            f" │ DDR: {ddr_bandwidth:4.1f}GB/s │ L1: {l1_bandwidth:4.1f}GB/s"
+            f" │ DDR: " + self._colorize_text(f"{ddr_bandwidth:4.1f}GB/s", "bright_cyan") +
+            f" │ L1: " + self._colorize_text(f"{l1_bandwidth:4.1f}GB/s", "bright_yellow")
         ])
 
         return "".join(flow_chars)
@@ -1892,15 +1921,24 @@ class TTTopDisplay(Static):
             else:
                 temp_status = self._colorize_text("COOL", temp_color)
 
-            # Memory activity pattern based on real power consumption
+            # Memory activity pattern based on real power consumption WITH RAINBOW COLORS
             memory_banks = self._generate_memory_pattern(power, i)
-            # Color the memory banks based on activity
+            # Color the memory banks with vibrant rainbow gradient based on activity
             colored_memory = ""
-            for bank in memory_banks:
+            active_count = memory_banks.count("●")
+            active_idx = 0
+            # Rainbow colors for active banks: red -> orange -> yellow -> green -> cyan -> blue -> magenta
+            rainbow_colors = ["bold red", "orange1", "bold yellow", "bright_green", "bright_cyan", "bright_blue", "bright_magenta", "bold magenta"]
+            for bank_idx, bank in enumerate(memory_banks):
                 if bank == "●":
-                    colored_memory += "[bright_magenta]●[/bright_magenta]"
+                    # Use rainbow gradient based on position in active sequence
+                    color_idx = (active_idx * len(rainbow_colors)) // max(active_count, 1)
+                    color = rainbow_colors[min(color_idx, len(rainbow_colors) - 1)]
+                    colored_memory += f"[{color}]●[/{color}]"
+                    active_idx += 1
                 else:
-                    colored_memory += "[dim white]◯[/dim white]"
+                    # Idle banks in dim blue
+                    colored_memory += "[dim blue]◯[/dim blue]"
 
             # Create BBS-style device entry with colors
             device_line = f"[bright_cyan]│[/bright_cyan] [bright_white]\\[[/bright_white][orange1]{i}[/orange1][bright_white]\\][/bright_white] [bold bright_white]{device_name:10s}[/bold bright_white] {status_icon} [bright_cyan]│[/bright_cyan]{status_block}[bright_cyan]│[/bright_cyan] [bright_white]{temp_display}[/bright_white] {temp_status}"
@@ -1910,17 +1948,29 @@ class TTTopDisplay(Static):
             tech_line = f"[bright_cyan]│[/bright_cyan]     [dim bright_white]{board_type:8s}[/dim bright_white] {colored_memory} [bright_cyan]{voltage:4.2f}V[/bright_cyan] [bright_green]{current:5.1f}A[/bright_green] [orange1]{power:5.1f}W[/orange1]"
             lines.append(tech_line)
 
-            # Interconnect activity flow based on real current draw
+            # Interconnect activity flow based on real current draw WITH RAINBOW FLOW
             flow_line = self._create_data_flow_line(current, i)
-            # Color the flow indicators
+            # Color the flow indicators with vibrant animated colors
             colored_flow = ""
-            for char in flow_line:
-                if char in "▶▷":
-                    colored_flow += f"[bright_magenta]{char}[/bright_magenta]"
-                elif char in "▸▹":
+            flow_colors = ["bold red", "orange1", "bold yellow", "bright_green", "bright_cyan", "bright_blue", "bright_magenta"]
+            for char_idx, char in enumerate(flow_line):
+                if char in "▶":
+                    # High intensity - cycling rainbow
+                    color = flow_colors[(char_idx + self.animation_frame) % len(flow_colors)]
+                    colored_flow += f"[{color}]{char}[/{color}]"
+                elif char in "▷":
+                    # Medium intensity - warm colors
+                    color = flow_colors[(char_idx + self.animation_frame) % 4]  # red -> orange -> yellow -> green
+                    colored_flow += f"[{color}]{char}[/{color}]"
+                elif char in "▸":
+                    # Low intensity - cool colors
+                    color = flow_colors[4 + (char_idx % 3)]  # cyan -> blue -> magenta
+                    colored_flow += f"[{color}]{char}[/{color}]"
+                elif char in "▹":
+                    # Very low - single color
                     colored_flow += f"[bright_cyan]{char}[/bright_cyan]"
                 else:
-                    colored_flow += f"[dim white]{char}[/dim white]"
+                    colored_flow += f"[dim blue]{char}[/dim blue]"
 
             activity_line = f"[bright_cyan]│[/bright_cyan]     [dim bright_white]DATA:[/dim bright_white] {colored_flow}"
             lines.append(activity_line)
@@ -1999,19 +2049,20 @@ class TTTopDisplay(Static):
         lines.append("[bright_cyan]├────────────┼───────────────────────────────────────────┼─────[/bright_cyan]")
 
         chars = " ·∙▁▂▃▄▅▆▇█"
-        char_colors = ["dim white", "dim white", "dim white", "bright_cyan", "bright_cyan", "bright_green", "orange1", "orange3", "red", "bold red", "bold red"]
+        # VIBRANT RAINBOW HEATMAP COLORS - cool to hot spectrum
+        char_colors = ["dim blue", "blue", "bright_blue", "bright_cyan", "cyan", "bright_green", "bright_yellow", "bold yellow", "orange1", "bold orange1", "bold red"]
 
         for i, device in enumerate(self.backend.devices):
             device_name = self.backend.get_device_name(device)[:10]
             telem = self.backend.device_telemetrys[i]
             power = float(telem.get('power', '0.0'))
 
-            # Generate heatmap based on current power (not fake historical data)
+            # Generate VIBRANT heatmap based on current power
             # In real implementation, this would use a rolling buffer of historical power data
             heatmap = ""
             current_intensity = min(int(power / 10), len(chars) - 1)
 
-            # Show consistent pattern based on current power level
+            # Show consistent pattern based on current power level with rainbow gradient
             # This represents the current activity level across the timeline
             for t in range(39):  # 39 characters for timeline
                 # Use current power level as baseline (real data)
@@ -2022,7 +2073,12 @@ class TTTopDisplay(Static):
                     intensity = 0
 
                 char = chars[min(intensity, len(chars) - 1)]
-                color = char_colors[min(intensity, len(char_colors) - 1)]
+                # Enhanced color selection with animation for active cells
+                color_idx = min(intensity, len(char_colors) - 1)
+                # Add subtle animation to active cells
+                if intensity > 5 and (t + self.animation_frame) % 3 == 0:
+                    color_idx = min(color_idx + 1, len(char_colors) - 1)
+                color = char_colors[color_idx]
                 heatmap += f"[{color}]{char}[/{color}]"
 
             # Current power indicator with colors
@@ -2184,7 +2240,7 @@ class TTLiveMonitor(Container):
         Binding("end", "scroll_end", "Go to Bottom", show=False),
     ]
 
-    def __init__(self, backend: TTSMIBackend, **kwargs):
+    def __init__(self, backend: Any, **kwargs):  # JSONBackendAdapter or compatible
         super().__init__(**kwargs)
         self.backend = backend
 

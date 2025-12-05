@@ -1,0 +1,12 @@
+# TT-Top Dependencies (JSON-only mode)
+# Minimal dependencies for JSON-based architecture
+
+# Core visualization
+textual>=0.59.0
+rich>=13.7.0
+
+# Data models and validation
+pydantic>=1.9.0
+
+# System process detection
+psutil>=5.9.0

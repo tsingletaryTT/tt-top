@@ -1,6 +1,6 @@
 # TT-Top - Real-time Hardware Monitor for Tenstorrent Silicon
 
-TT-Top is a standalone real-time hardware monitoring application for Tenstorrent devices, forked from TT-SMI to focus exclusively on live telemetry visualization and hardware insights.
+TT-Top is a standalone real-time hardware monitoring application for Tenstorrent devices. It follows the UNIX philosophy by consuming JSON telemetry data from tt-smi, providing live visualization and hardware insights without requiring direct hardware access.
 
 ## Features
 
@@ -46,25 +46,48 @@ pip install -e . -c pyproject_tttop.toml
 ```
 
 ### Dependencies
+
+#### Core Dependencies (Always Required)
 - Python 3.10+
 - Textual >= 0.59.0
 - Rich >= 13.7.0
 - psutil >= 5.9.0
-- pyluwen == 0.7.11
-- tt_tools_common == 1.4.29
+- pydantic >= 1.9.0
+
+#### Backend Requirements
+**JSON Mode (Default)**:
+- tt-smi installed and accessible in PATH
+- tt-smi must support `--json --continuous` flags
+
+**Mock Mode (Testing)**:
+- No additional dependencies (built-in)
 
 ## Usage
 
 ### Basic Monitoring
+
+**Standard Usage (requires tt-smi)**:
 ```bash
-# Start live monitoring (all devices)
+# Start live monitoring (spawns tt-smi subprocess)
 tt-top
 
 # Monitor specific device
 tt-top --device 0
 
+# Use custom tt-smi path
+tt-top --tt-smi-path /path/to/tt-smi
+
 # Enable debug logging
 tt-top --log-level DEBUG
+```
+
+**Mock Mode (testing without hardware)**:
+```bash
+# Use simulated mock data
+tt-top --mock
+
+# Mock mode with debug output
+tt-top --mock --log-level DEBUG
 ```
 
 ### Keyboard Shortcuts
@@ -106,11 +129,34 @@ tt-top --log-level DEBUG
 
 ## Architecture
 
-### Backend Integration
-TT-Top uses the same backend as TT-SMI for hardware communication:
-- **TTSMIBackend**: Device discovery and telemetry collection
-- **SMBUS Integration**: Direct hardware telemetry access
-- **Cross-platform**: Linux and other UNIX-like systems
+### Architecture
+
+**Data Flow**:
+```
+tt-smi --json --continuous (subprocess)
+   ↓
+JSON telemetry stream (stdout, line-buffered)
+   ↓
+JSONBackendAdapter (parse & cache)
+   ↓
+DeviceProxy objects (architecture detection)
+   ↓
+Visualization Widgets (unchanged interface)
+   ↓
+Hardware-responsive terminal display
+```
+
+**Key Principles**:
+- **UNIX Philosophy**: Composable tools with clean data interfaces
+- **Decoupled**: tt-top has zero direct hardware dependencies
+- **Subprocess Isolation**: tt-smi handles all hardware access
+- **JSON Contract**: All improvements flow through JSON schema
+- **Portable**: Works anywhere tt-smi runs (local, remote, containers)
+- **Testable**: Mock mode for CI/CD and development
+
+**Backend Modes**:
+- **JSON Mode**: Spawns tt-smi subprocess, parses JSON telemetry (default)
+- **Mock Mode**: Generates simulated data for testing (`--mock` flag)
 
 ### Hardware Support
 - **Grayskull**: 4 DDR channels, 10×12 Tensix grid
@@ -122,25 +168,33 @@ TT-Top uses the same backend as TT-SMI for hardware communication:
 ### Project Structure
 ```
 tt_top/
-├── __init__.py              # Package initialization
-├── tt_top_app.py           # Main application class
-├── tt_top_widget.py        # Live monitoring widget
-├── tt_smi_backend.py       # Hardware communication backend
-├── constants.py            # Configuration constants
-└── log.py                  # Logging utilities
+├── __init__.py                 # Package initialization
+├── tt_top_app.py               # Main application (backend mode selection)
+├── tt_top_widget.py            # Live monitoring widget
+├── json_backend_adapter.py     # JSON backend adapter (core)
+├── device_proxy.py             # Architecture detection (GS/WH/BH)
+├── animated_display.py         # Hardware-responsive visualization
+├── simple_animated_display.py  # Alternative visualization mode
+├── constants.py                # Configuration constants
+├── log.py                      # Pydantic models for JSON parsing
+└── workload_config.py          # ML framework detection patterns
 ```
 
-### Key Differences from TT-SMI
-- **Standalone Application**: No tab interface, direct to live monitoring
-- **Focused Scope**: Exclusively real-time visualization
-- **Enhanced Analytics**: Advanced workload detection and memory visualization
-- **Performance Optimized**: 100ms refresh rate for responsive monitoring
+### Key Design Principles
+- **UNIX Philosophy**: Tools communicate via standard formats (JSON over stdout)
+- **Clean Separation**: Data acquisition (tt-smi) vs visualization (tt-top)
+- **Zero Hardware Dependencies**: tt-top never touches hardware directly
+- **JSON Contract**: All features flow through JSON schema evolution
+- **Hybrid Workload Detection**: tt-smi provides telemetry, tt-top scans /proc
+- **Mock-Friendly**: Built-in mock mode for development and CI/CD
 
 ### Contributing
-TT-Top is forked from TT-SMI and maintains compatibility with the underlying hardware abstraction layer. Contributions should focus on:
-- Enhanced visualization techniques
-- Advanced analytics and insights
-- Performance optimizations
+Contributions should focus on:
+- Enhanced visualizations using JSON telemetry
+- Improved ML framework detection and correlation
+- JSON schema extensions (propose to tt-smi project)
+- Performance optimizations in parsing/rendering
+- Alternative backend adapters (file replay, network streaming)
 - Cross-platform compatibility
 
 ## License

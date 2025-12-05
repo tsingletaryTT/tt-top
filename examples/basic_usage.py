@@ -15,7 +15,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
-    from tt_top.tt_smi_backend import TTSMIBackend
+    # Updated for JSON-only mode
+    from tt_top.json_backend_adapter import JSONBackendAdapter
     from tt_top.tt_top_widget import TTTopDisplay
     from tt_top.tt_top_app import TTTopApp, parse_args
 except ImportError as e:
@@ -29,7 +30,7 @@ def basic_telemetry_example():
     print("=== Basic Telemetry Example ===")
 
     try:
-        backend = TTSMIBackend()
+        backend = JSONBackendAdapter(mock_mode=True)  # Use mock mode for examples
         print(f"Detected {len(backend.devices)} Tenstorrent devices")
 
         # Update telemetry once
@@ -57,7 +58,7 @@ def monitoring_loop_example():
     print("Monitoring for 10 seconds (Ctrl+C to stop early)...")
 
     try:
-        backend = TTSMIBackend()
+        backend = JSONBackendAdapter(mock_mode=True)  # Use mock mode for examples
         start_time = time.time()
 
         while time.time() - start_time < 10:  # Monitor for 10 seconds
@@ -88,7 +89,7 @@ def device_info_example():
     print("\n=== Device Information Example ===")
 
     try:
-        backend = TTSMIBackend()
+        backend = JSONBackendAdapter(mock_mode=True)  # Use mock mode for examples
 
         for i, device in enumerate(backend.devices):
             device_name = backend.get_device_name(device)
