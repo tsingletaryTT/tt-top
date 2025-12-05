@@ -198,7 +198,7 @@ class HardwareStarfield:
         self.hello_shown_count = 0  # Count how many times Hello has been shown
         self.show_hello_text = False  # Flag to show Hello text during current celebration
 
-    def initialize_stars(self, backend: Any  # JSONBackendAdapter or compatible) -> None:
+    def initialize_stars(self, backend: Any)  # JSONBackendAdapter or compatible -> None:
         """Initialize stars based on actual hardware topology
 
         Creates stars that correspond to real hardware elements:
@@ -357,7 +357,7 @@ class HardwareStarfield:
                     self.stars.append(star)
                     star_id += 1
 
-    def _update_baseline(self, backend: Any  # JSONBackendAdapter or compatible) -> None:
+    def _update_baseline(self, backend: Any)  # JSONBackendAdapter or compatible -> None:
         """Update the adaptive baseline from current telemetry readings"""
         if self.baseline_established:
             return
@@ -407,7 +407,7 @@ class HardwareStarfield:
 
         return (current_value - baseline_value) / baseline_value
 
-    def _detect_new_workload(self, backend: Any  # JSONBackendAdapter or compatible) -> bool:
+    def _detect_new_workload(self, backend: Any)  # JSONBackendAdapter or compatible -> bool:
         """
         Detect if a new workload has started based on significant activity increase from baseline
         
@@ -456,7 +456,7 @@ class HardwareStarfield:
         
         return new_workload_detected
 
-    def _should_show_hello(self, backend: Any  # JSONBackendAdapter or compatible) -> bool:
+    def _should_show_hello(self, backend: Any)  # JSONBackendAdapter or compatible -> bool:
         """
         Check if Hello text should be displayed based on higher activity threshold
 
@@ -503,7 +503,7 @@ class HardwareStarfield:
 
         return False
 
-    def update_from_telemetry(self, backend: Any  # JSONBackendAdapter or compatible, frame_count: int) -> None:
+    def update_from_telemetry(self, backend: Any, frame_count: int) -> None:  # JSONBackendAdapter or compatible
         """Update star properties based on real hardware telemetry with adaptive baseline scaling
 
         This is what makes the visualization hardware-responsive rather than
@@ -1015,7 +1015,7 @@ class FlowingDataStreams:
         self.height = height
         self.streams = []
 
-    def update_streams(self, backend: Any  # JSONBackendAdapter or compatible, frame_count: int) -> None:
+    def update_streams(self, backend: Any, frame_count: int) -> None:  # JSONBackendAdapter or compatible
         """Update data streams based on real interconnect activity"""
         self.streams = []
 
@@ -1131,7 +1131,7 @@ class HardwareResponsiveASCII(Static):
         Binding("escape", "exit_visualization", "Exit Visualization", show=False),
     ]
 
-    def __init__(self, backend: Any  # JSONBackendAdapter or compatible, **kwargs):
+    def __init__(self, backend: Any, **kwargs):  # JSONBackendAdapter or compatible
         super().__init__(**kwargs)
         self.backend = backend
         self.frame_count = 0
@@ -1502,7 +1502,7 @@ class AnimatedDisplayContainer(Container):
         Binding("w", "trigger_workload_celebration", "Test Workload Celebration", show=True),
     ]
 
-    def __init__(self, backend: Any  # JSONBackendAdapter or compatible, **kwargs):
+    def __init__(self, backend: Any, **kwargs):  # JSONBackendAdapter or compatible
         super().__init__(**kwargs)
         self.backend = backend
         self.is_visualization_mode = False

@@ -40,7 +40,7 @@ class TTTopDisplay(Static):
     More compatible across Textual versions.
     """
 
-    def __init__(self, backend: Any  # JSONBackendAdapter or compatible, **kwargs):
+    def __init__(self, backend: Any, **kwargs):  # JSONBackendAdapter or compatible
         super().__init__(**kwargs)
         self.backend = backend
         self.animation_frame = 0
@@ -2185,7 +2185,7 @@ class TTLiveMonitor(Container):
         Binding("end", "scroll_end", "Go to Bottom", show=False),
     ]
 
-    def __init__(self, backend: Any  # JSONBackendAdapter or compatible, **kwargs):
+    def __init__(self, backend: Any, **kwargs):  # JSONBackendAdapter or compatible
         super().__init__(**kwargs)
         self.backend = backend
 
