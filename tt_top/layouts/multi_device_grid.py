@@ -95,7 +95,9 @@ class MultiDeviceGrid(Grid):
 
         # Apply grid sizing
         self.styles.grid_size_columns = columns
-        self.styles.grid_size_rows = "auto"  # Rows fit content
+        # Calculate rows based on device count and columns
+        rows = (num_devices + columns - 1) // columns  # Ceiling division
+        self.styles.grid_size_rows = rows
 
         # Yield device cards
         for i in range(num_devices):
