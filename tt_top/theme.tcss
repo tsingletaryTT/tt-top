@@ -1,0 +1,303 @@
+/* TT-Top Organic Theme - Textual CSS (TCSS)
+ *
+ * Design Philosophy:
+ * - height: auto for organic growth (no rigid boxes)
+ * - fr units for responsive sizing
+ * - Transparency for depth (30%, 50%, 70%)
+ * - Round borders for softer aesthetic
+ * - No manual calculations—Textual handles it all
+ */
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* Global Screen */
+/* ─────────────────────────────────────────────────────────────────── */
+
+Screen {
+    background: $surface;
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* Container Defaults (Organic Sizing) */
+/* ─────────────────────────────────────────────────────────────────── */
+
+/* Scrollable containers */
+VerticalScroll {
+    height: 100%;
+    scrollbar-gutter: stable;  /* Prevent content shift when scrollbar appears */
+    padding: 1;
+}
+
+/* Non-expanding containers (fit to content) */
+VerticalGroup, HorizontalGroup {
+    height: auto;  /* KEY: Grows with content, not rigid */
+    padding: 0;
+    margin: 0;
+}
+
+/* Grid layouts */
+Grid {
+    height: auto;
+    padding: 0;
+}
+
+Grid > * {
+    height: auto;  /* All grid items auto-size */
+}
+
+/* Generic static widgets */
+Static {
+    height: auto;  /* Default to content-based sizing */
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* Device Telemetry Cards */
+/* ─────────────────────────────────────────────────────────────────── */
+
+DeviceTelemetryCard {
+    border: round $accent 70%;  /* Round, semi-transparent */
+    padding: 1;
+    height: auto;  /* Grows with content */
+    width: 1fr;    /* Equal columns in grid */
+    margin: 1;
+}
+
+/* Focus state - full opacity */
+DeviceTelemetryCard:focus {
+    border: round $accent;
+    background: $boost 10%;  /* Subtle background highlight */
+}
+
+/* Compact variant for many devices */
+DeviceTelemetryCard.-compact {
+    padding: 0 1;
+    margin: 0 1;
+    border: round $accent 50%;  /* More transparent when compact */
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* Multi-Device Grid */
+/* ─────────────────────────────────────────────────────────────────── */
+
+MultiDeviceGrid {
+    height: auto;
+    padding: 1;
+    grid-gutter: 1;  /* Space between cards */
+}
+
+MultiDeviceGrid > DeviceTelemetryCard {
+    width: 1fr;   /* Equal column widths */
+    height: auto;
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* Collapsible Sections (Accordion) */
+/* ─────────────────────────────────────────────────────────────────── */
+
+Collapsible {
+    border: round $primary 50%;
+    margin: 1 0;
+    height: auto;
+}
+
+/* Collapsed state - dimmer border */
+Collapsible.-collapsed {
+    border: dashed $primary 30%;
+}
+
+/* Expanded state - brighter border */
+Collapsible:focus {
+    border: round $primary;
+}
+
+/* Collapsible contents */
+Collapsible > Contents {
+    padding: 1;
+    height: auto;
+    background: $panel 20%;  /* Subtle background depth */
+}
+
+/* Collapsible title */
+Collapsible > CollapsibleTitle {
+    background: $primary 20%;
+    padding: 0 1;
+    text-style: bold;
+}
+
+Collapsible > CollapsibleTitle:hover {
+    background: $primary 40%;
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* DataTable (Event Stream, Stats) */
+/* ─────────────────────────────────────────────────────────────────── */
+
+DataTable {
+    border: heavy $accent;
+    height: 12;  /* Fixed height for scrolling */
+    margin: 1 0;
+}
+
+/* Table header */
+DataTable > .datatable--header {
+    background: $accent 30%;
+    text-style: bold;
+}
+
+/* Cursor row */
+DataTable > .datatable--cursor {
+    background: $secondary 50%;
+}
+
+/* Zebra striping */
+DataTable > .datatable--odd {
+    background: $surface;
+}
+
+DataTable > .datatable--even {
+    background: $panel 10%;
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* Section Headers */
+/* ─────────────────────────────────────────────────────────────────── */
+
+.section-header {
+    background: $accent 30%;
+    padding: 0 1;
+    text-style: bold;
+    height: 1;
+    border: round $accent 50%;
+    margin: 1 0 0 0;
+}
+
+.section-content {
+    padding: 1;
+    height: auto;
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* Panel Containers */
+/* ─────────────────────────────────────────────────────────────────── */
+
+.panel {
+    border: round $primary 40%;
+    padding: 1;
+    height: auto;
+    margin: 1 0;
+}
+
+.panel:focus {
+    border: round $primary 70%;
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* Alert/Status Indicators */
+/* ─────────────────────────────────────────────────────────────────── */
+
+.status-ok {
+    color: $success;
+}
+
+.status-warning {
+    color: $warning;
+}
+
+.status-error {
+    color: $error;
+}
+
+.status-info {
+    color: $accent;
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* Metric Bars (Progress-like displays) */
+/* ─────────────────────────────────────────────────────────────────── */
+
+.metric-bar {
+    height: 1;
+    width: 100%;
+}
+
+.metric-bar-fill {
+    background: $success;
+}
+
+.metric-bar-empty {
+    background: $panel 30%;
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* Footer */
+/* ─────────────────────────────────────────────────────────────────── */
+
+Footer {
+    background: $panel;
+    color: $text;
+    dock: bottom;
+    height: 1;
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* Responsive Adjustments */
+/* ─────────────────────────────────────────────────────────────────── */
+
+/* When terminal width is narrow, reduce padding */
+@media (max-width: 80) {
+    DeviceTelemetryCard {
+        padding: 0 1;
+        margin: 0 1;
+    }
+
+    MultiDeviceGrid {
+        padding: 0;
+        grid-gutter: 0;
+    }
+}
+
+/* When terminal is very wide, limit card max-width */
+@media (min-width: 200) {
+    DeviceTelemetryCard {
+        max-width: 60;
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* Animation Classes (for dynamic states) */
+/* ─────────────────────────────────────────────────────────────────── */
+
+.pulse {
+    background: $accent 20%;
+}
+
+.highlight {
+    background: $warning 30%;
+}
+
+.dim {
+    opacity: 0.5;
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* Utility Classes */
+/* ─────────────────────────────────────────────────────────────────── */
+
+.hidden {
+    display: none;
+}
+
+.center {
+    text-align: center;
+}
+
+.right {
+    text-align: right;
+}
+
+.bold {
+    text-style: bold;
+}
+
+.italic {
+    text-style: italic;
+}

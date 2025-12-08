@@ -18,13 +18,16 @@ from textual.app import App
 from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Container
+from textual.containers import Container, VerticalScroll
 from textual.widgets import Footer
 
 from tt_top.json_backend_adapter import JSONBackendAdapter
 from tt_top.tt_top_widget import TTLiveMonitor
 from tt_top.animated_display import HardwareResponsiveASCII
 from tt_top.simple_animated_display import SimpleHardwareDisplay
+
+# New organic layout system
+from tt_top.layouts.multi_device_grid import MultiDeviceGrid
 
 # Set up logging
 import logging
@@ -38,13 +41,17 @@ class TTTopApp(App[None]):
     Provides live telemetry visualization for Tenstorrent devices without
     the traditional TT-SMI tab interface. Focused on continuous monitoring
     and real-time hardware insights.
+
+    Supports two layout modes:
+    - Classic: Traditional ASCII art rendering (tt_top_widget.py)
+    - Organic: Modern Textual-native responsive layout (new widgets/)
     """
 
-    CSS = """
-    Screen {
-        background: black;
-    }
+    # Load external CSS theme for organic layout
+    CSS_PATH = "theme.tcss"
 
+    # Additional inline CSS for classic mode
+    CSS = """
     TTLiveMonitor {
         width: 100%;
         height: 100%;
@@ -73,10 +80,10 @@ class TTTopApp(App[None]):
         border: solid $accent;
     }
 
-    Footer {
-        background: $surface;
-        color: $text;
-        dock: bottom;
+    /* Organic layout container */
+    #organic_layout {
+        width: 100%;
+        height: 100%;
     }
     """
 
@@ -87,6 +94,8 @@ class TTTopApp(App[None]):
         Binding("q", "quit", "Quit", priority=True),
         Binding("h", "help", "Help", priority=True),
         Binding("v", "toggle_visualization", "Toggle Visualization", priority=True),
+        Binding("1", "switch_layout('classic')", "Classic Layout", priority=True),
+        Binding("2", "switch_layout('organic')", "Organic Layout", priority=True),
         Binding("ctrl+c", "quit", "Quit", show=False),
         Binding("escape", "exit_mode", "Exit Mode", show=False),
         # Scrolling bindings for the live monitor
@@ -98,29 +107,65 @@ class TTTopApp(App[None]):
         Binding("end", "scroll_end", "End", show=False),
     ]
 
-    def __init__(self, backend: JSONBackendAdapter, **kwargs) -> None:
+    def __init__(self, backend: JSONBackendAdapter, layout_mode: str = "organic", **kwargs) -> None:
         """Initialize TT-Top application with JSON backend
 
         Args:
             backend: JSONBackendAdapter instance for device communication
+            layout_mode: Initial layout mode ('classic' or 'organic')
             **kwargs: Additional arguments passed to parent App
         """
         super().__init__(**kwargs)
         self.backend = backend
         self.live_monitor: Optional[TTLiveMonitor] = None
         self.animated_display: Optional[HardwareResponsiveASCII] = None
+        self.organic_layout: Optional[VerticalScroll] = None
         self.visualization_mode = False
+        self.layout_mode = layout_mode  # 'classic' or 'organic'
 
     def compose(self) -> ComposeResult:
         """Compose the TT-Top application layout
 
-        Creates a full-screen live monitor widget without tabs,
-        providing direct access to real-time hardware visualization.
+        Creates either classic or organic layout based on mode.
+        Supports runtime switching between layouts via key bindings.
         """
-        # Create the live monitor as the primary interface
-        self.live_monitor = TTLiveMonitor(backend=self.backend)
-        yield self.live_monitor
+        # Create both layouts, but only show active one
+        if self.layout_mode == "organic":
+            # New organic layout with Textual-native widgets
+            self.organic_layout = self._create_organic_layout()
+            yield self.organic_layout
+
+            # Create classic layout hidden
+            self.live_monitor = TTLiveMonitor(backend=self.backend)
+            self.live_monitor.display = False
+            yield self.live_monitor
+        else:
+            # Classic ASCII art layout
+            self.live_monitor = TTLiveMonitor(backend=self.backend)
+            yield self.live_monitor
+
+            # Create organic layout hidden
+            self.organic_layout = self._create_organic_layout()
+            self.organic_layout.display = False
+            yield self.organic_layout
+
         yield Footer()
+
+    def _create_organic_layout(self) -> VerticalScroll:
+        """Create the organic Textual-native layout
+
+        Returns scrollable container with:
+        - Multi-device grid (responsive columns)
+        - Auto-sizing cards (height: auto)
+        - Native borders (no custom ASCII)
+        """
+        container = VerticalScroll(id="organic_layout")
+
+        # Add multi-device grid
+        grid = MultiDeviceGrid(backend=self.backend, id="device_grid")
+        container.mount(grid)
+
+        return container
 
     def on_mount(self) -> None:
         """Handle application mounting
@@ -158,6 +203,39 @@ class TTTopApp(App[None]):
         else:
             self.action_quit()
 
+    def action_switch_layout(self, mode: str) -> None:
+        """Switch between classic and organic layouts
+
+        Args:
+            mode: 'classic' or 'organic'
+        """
+        if self.visualization_mode:
+            # Don't switch layouts while in visualization mode
+            return
+
+        if mode == self.layout_mode:
+            # Already in this mode
+            return
+
+        self.layout_mode = mode
+
+        if mode == "organic":
+            # Show organic, hide classic
+            if self.organic_layout:
+                self.organic_layout.display = True
+            if self.live_monitor:
+                self.live_monitor.display = False
+            self.sub_title = "Organic Layout - Textual-Native Responsive Design"
+            logger.info("Switched to organic layout")
+        else:
+            # Show classic, hide organic
+            if self.live_monitor:
+                self.live_monitor.display = True
+            if self.organic_layout:
+                self.organic_layout.display = False
+            self.sub_title = "Classic Layout - ASCII Art Rendering"
+            logger.info("Switched to classic layout")
+
     def _enter_visualization_mode(self) -> None:
         """Enter full-screen animated visualization mode"""
         self.visualization_mode = True
@@ -194,6 +272,48 @@ class TTTopApp(App[None]):
 
         # Restore subtitle
         self.sub_title = "Real-time telemetry and hardware visualization"
+
+    def action_scroll_up(self) -> None:
+        """Scroll up in active layout"""
+        if self.layout_mode == "organic" and self.organic_layout:
+            self.organic_layout.scroll_up()
+        elif self.live_monitor:
+            self.live_monitor.scroll_up()
+
+    def action_scroll_down(self) -> None:
+        """Scroll down in active layout"""
+        if self.layout_mode == "organic" and self.organic_layout:
+            self.organic_layout.scroll_down()
+        elif self.live_monitor:
+            self.live_monitor.scroll_down()
+
+    def action_page_up(self) -> None:
+        """Page up in active layout"""
+        if self.layout_mode == "organic" and self.organic_layout:
+            self.organic_layout.scroll_page_up()
+        elif self.live_monitor:
+            self.live_monitor.scroll_page_up()
+
+    def action_page_down(self) -> None:
+        """Page down in active layout"""
+        if self.layout_mode == "organic" and self.organic_layout:
+            self.organic_layout.scroll_page_down()
+        elif self.live_monitor:
+            self.live_monitor.scroll_page_down()
+
+    def action_scroll_home(self) -> None:
+        """Scroll to top in active layout"""
+        if self.layout_mode == "organic" and self.organic_layout:
+            self.organic_layout.scroll_home()
+        elif self.live_monitor:
+            self.live_monitor.scroll_home()
+
+    def action_scroll_end(self) -> None:
+        """Scroll to bottom in active layout"""
+        if self.layout_mode == "organic" and self.organic_layout:
+            self.organic_layout.scroll_end()
+        elif self.live_monitor:
+            self.live_monitor.scroll_end()
 
     def action_help(self) -> None:
         """Handle help action - show help message"""
