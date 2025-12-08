@@ -243,15 +243,15 @@ class Firmwares(ElasticModel):
 
 @optional
 class Limits(ElasticModel):
-    vdd_min: str
-    vdd_max: str
-    tdp_limit: str
-    tdc_limit: str
-    asic_fmax: str
-    therm_trip_l1_limit: str
-    thm_limit: str
-    bus_peak_limit: str
-    board_power_limit: str
+    vdd_min: Optional[str]
+    vdd_max: Optional[str]
+    tdp_limit: Optional[str]
+    tdc_limit: Optional[str]
+    asic_fmax: Optional[str]
+    therm_trip_l1_limit: Optional[str]
+    thm_limit: Optional[str]
+    bus_peak_limit: Optional[str]
+    board_power_limit: Optional[str]
 
 
 @optional

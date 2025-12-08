@@ -51,6 +51,7 @@ include-package-data = true
 "*" = [
   'data/version.txt',
   "*.css",
+  "*.tcss",
   "data/*/*.yaml",
   "data/*/*/*.yaml",
 ]
