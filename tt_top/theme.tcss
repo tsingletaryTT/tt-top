@@ -242,25 +242,10 @@ Footer {
 /* Responsive Adjustments */
 /* ─────────────────────────────────────────────────────────────────── */
 
-/* When terminal width is narrow, reduce padding */
-@media (max-width: 80) {
-    DeviceTelemetryCard {
-        padding: 0 1;
-        margin: 0 1;
-    }
-
-    MultiDeviceGrid {
-        padding: 0;
-        grid-gutter: 0;
-    }
-}
-
-/* When terminal is very wide, limit card max-width */
-@media (min-width: 200) {
-    DeviceTelemetryCard {
-        max-width: 60;
-    }
-}
+/* Note: @media queries not available in older Textual versions
+ * Responsive sizing handled by Python code in multi_device_grid.py
+ * via compact mode and dynamic grid columns
+ */
 
 /* ─────────────────────────────────────────────────────────────────── */
 /* Animation Classes (for dynamic states) */
