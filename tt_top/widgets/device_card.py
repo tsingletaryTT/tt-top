@@ -11,7 +11,6 @@ Uses auto-height, native borders, and Rich rendering for progress bars.
 
 from typing import Any
 from textual.widgets import Static
-from textual.containers import VerticalGroup
 from textual.app import ComposeResult
 from rich.text import Text
 from rich.console import RenderableType

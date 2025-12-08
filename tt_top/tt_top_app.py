@@ -18,8 +18,15 @@ from textual.app import App
 from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, VerticalScroll
+from textual.containers import Container
 from textual.widgets import Footer
+
+# Try to import VerticalScroll (added in newer Textual versions)
+try:
+    from textual.containers import VerticalScroll
+except ImportError:
+    # Fallback for older Textual versions: use Container with CSS overflow
+    VerticalScroll = Container
 
 from tt_top.json_backend_adapter import JSONBackendAdapter
 from tt_top.tt_top_widget import TTLiveMonitor
@@ -84,6 +91,8 @@ class TTTopApp(App[None]):
     #organic_layout {
         width: 100%;
         height: 100%;
+        overflow-y: auto;  /* Enable scrolling for older Textual versions */
+        overflow-x: hidden;
     }
     """
 
