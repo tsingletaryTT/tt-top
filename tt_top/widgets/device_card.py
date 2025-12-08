@@ -91,12 +91,31 @@ class DeviceTelemetryCard(Static):
         device = self.backend.devices[self.device_idx]
         telem = self.backend.device_telemetrys[self.device_idx]
 
-        # Extract values
-        power = telem.get('power', 0)
-        temp = telem.get('asic_temperature', 0)
-        current = telem.get('current', 0)
-        aiclk = telem.get('aiclk', 0)
-        voltage = telem.get('voltage', 0)
+        # Extract values (convert strings to floats)
+        try:
+            power = float(telem.get('power', 0))
+        except (ValueError, TypeError):
+            power = 0.0
+
+        try:
+            temp = float(telem.get('asic_temperature', 0))
+        except (ValueError, TypeError):
+            temp = 0.0
+
+        try:
+            current = float(telem.get('current', 0))
+        except (ValueError, TypeError):
+            current = 0.0
+
+        try:
+            aiclk = float(telem.get('aiclk', 0))
+        except (ValueError, TypeError):
+            aiclk = 0.0
+
+        try:
+            voltage = float(telem.get('voltage', 0))
+        except (ValueError, TypeError):
+            voltage = 0.0
 
         # Get architecture name
         arch_name = self._get_architecture_name(device)
