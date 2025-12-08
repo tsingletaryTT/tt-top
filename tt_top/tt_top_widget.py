@@ -46,6 +46,9 @@ class TTTopDisplay(Static):
         self.animation_frame = 0
         self.start_time = time.time()  # Track when the display was created
 
+        # Workload detection debug statistics
+        self._workload_debug_stats = {'total_procs': 0, 'python_procs': 0, 'pattern_matches': 0, 'high_resource': 0}
+
     def on_mount(self) -> None:
         """Set up dynamic periodic updates with hardware safety coordination"""
         # Start with initial safety-aware interval instead of fixed interval
@@ -532,6 +535,15 @@ class TTTopDisplay(Static):
             self._colorize_text("Memory patterns", "bright_cyan") + " • " +
             self._colorize_text("Telemetry correlation", "bright_cyan")
         ))
+
+        # Add debug statistics line (helpful for troubleshooting)
+        debug_stats = self._workload_debug_stats
+        debug_line = (f"Debug: Scanned {debug_stats.get('total_procs', 0)} procs │ "
+                     f"{debug_stats.get('python_procs', 0)} Python │ "
+                     f"{debug_stats.get('pattern_matches', 0)} matches │ "
+                     f"{debug_stats.get('high_resource', 0)} high-resource")
+        lines.append(self._create_bordered_line(self._colorize_text(debug_line, "dim white")))
+
         lines.append(self._create_section_border())
 
         try:
@@ -610,15 +622,25 @@ class TTTopDisplay(Static):
         return detected_workloads
 
     def _detect_ml_workloads_psutil(self) -> List[dict]:
-        """Detect ML workloads using psutil library (preferred method)"""
+        """Detect ML workloads using psutil library (preferred method)
+
+        Enhanced detection with:
+        - Broad Python process detection (high memory + threads)
+        - Device file access detection (/dev/tenstorrent/*)
+        - Expanded framework patterns
+        - Debug statistics logging
+        """
         import psutil
         import re
+        import os
 
         detected_workloads = []
+        debug_stats = {'total_procs': 0, 'python_procs': 0, 'pattern_matches': 0, 'high_resource': 0}
 
         try:
-            for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'memory_info', 'num_threads']):
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'memory_info', 'num_threads', 'open_files']):
                 try:
+                    debug_stats['total_procs'] += 1
                     proc_info = proc.info
                     if not proc_info['cmdline']:
                         continue
@@ -627,19 +649,67 @@ class TTTopDisplay(Static):
                     cmdline = ' '.join(proc_info['cmdline'])
                     pid = proc_info['pid']
 
+                    # Track Python processes
+                    if 'python' in proc_info.get('name', '').lower():
+                        debug_stats['python_procs'] += 1
+
+                    # Check for Tenstorrent device file access
+                    has_tt_device = False
+                    try:
+                        open_files = proc_info.get('open_files', [])
+                        if open_files:
+                            for f in open_files:
+                                if '/dev/tenstorrent' in getattr(f, 'path', ''):
+                                    has_tt_device = True
+                                    break
+                    except:
+                        pass
+
                     # Analyze for ML patterns
                     workload_info = self._analyze_cmdline_for_ml_patterns(
                         pid, cmdline, proc_info.get('memory_info'), proc_info.get('num_threads', 1)
                     )
 
+                    # Enhanced detection: catch ANY Python process with significant resources
+                    if not workload_info or workload_info['confidence'] < 0.3:
+                        # Fallback: high-resource Python processes likely doing ML work
+                        memory_info = proc_info.get('memory_info')
+                        num_threads = proc_info.get('num_threads', 1)
+
+                        if memory_info and 'python' in proc_info.get('name', '').lower():
+                            memory_gb = memory_info.rss / (1024 * 1024 * 1024)
+
+                            # High resource heuristic: >1GB RAM AND (>8 threads OR TT device access)
+                            if (memory_gb > 1.0 and num_threads > 8) or (memory_gb > 0.5 and has_tt_device):
+                                debug_stats['high_resource'] += 1
+                                workload_info = {
+                                    'pid': pid,
+                                    'cmdline': cmdline[:80] + '...' if len(cmdline) > 80 else cmdline,
+                                    'framework': 'python-unknown',
+                                    'model_type': 'unknown',
+                                    'workload_type': 'compute',
+                                    'confidence': 0.5 if has_tt_device else 0.4,
+                                    'correlation_score': 0.6 if has_tt_device else 0.3,
+                                    'memory_gb': memory_gb,
+                                    'thread_count': num_threads,
+                                    'cpu_percent': 0,
+                                    'has_tt_device': has_tt_device
+                                }
+
                     if workload_info and workload_info['confidence'] > 0.3:
+                        debug_stats['pattern_matches'] += 1
                         detected_workloads.append(workload_info)
 
                 except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                     continue
 
-        except Exception:
+        except Exception as e:
+            # Store debug info even on failure
+            self._workload_debug_stats = debug_stats
             return []
+
+        # Store debug statistics for display
+        self._workload_debug_stats = debug_stats
 
         detected_workloads.sort(key=lambda w: (w.get('correlation_score', 0), w['confidence']), reverse=True)
         return detected_workloads
