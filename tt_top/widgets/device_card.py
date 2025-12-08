@@ -89,7 +89,7 @@ class DeviceTelemetryCard(Static):
         """
         # Get device and telemetry data
         device = self.backend.devices[self.device_idx]
-        telem = self.backend.get_device_telemetry(self.device_idx)
+        telem = self.backend.device_telemetrys[self.device_idx]
 
         # Extract values
         power = telem.get('power', 0)
@@ -232,7 +232,7 @@ class DeviceTelemetryCard(Static):
     def _get_arc_status(self) -> str:
         """Get ARC firmware health status"""
         try:
-            telem = self.backend.get_device_telemetry(self.device_idx)
+            telem = self.backend.device_telemetrys[self.device_idx]
             heartbeat = telem.get('heartbeat', 0)
             if heartbeat > 0:
                 return "[bright_green]❤ Healthy[/]"
