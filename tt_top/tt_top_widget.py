@@ -49,6 +49,44 @@ class TTTopDisplay(Static):
         # Workload detection debug statistics
         self._workload_debug_stats = {'total_procs': 0, 'python_procs': 0, 'pattern_matches': 0, 'high_resource': 0}
 
+    def _safe_float(self, value: Any, default: float = 0.0) -> float:
+        """
+        Safely convert a value to float, handling hex strings and errors
+
+        Args:
+            value: Value to convert (string, int, float, etc.)
+            default: Default value if conversion fails
+
+        Returns:
+            Converted float value or default
+        """
+        try:
+            # Handle None
+            if value is None:
+                return default
+
+            # If already a number, return it
+            if isinstance(value, (int, float)):
+                return float(value)
+
+            # Convert to string and strip whitespace
+            str_value = str(value).strip()
+
+            # Handle empty strings
+            if not str_value:
+                return default
+
+            # Check if it's a hex string (heartbeat values, status codes)
+            if str_value.startswith('0x') or str_value.startswith('0X'):
+                # Hex strings are not numeric values - return default
+                return default
+
+            # Try normal float conversion
+            return float(str_value)
+
+        except (ValueError, TypeError):
+            return default
+
     def on_mount(self) -> None:
         """Set up dynamic periodic updates with hardware safety coordination"""
         # Start with initial safety-aware interval instead of fixed interval
@@ -175,7 +213,7 @@ class TTTopDisplay(Static):
     def _get_device_status_text(self, device_idx: int) -> str:
         """Get intelligent device status text with appropriate colors"""
         workload = self.backend.detect_workload_state(device_idx)
-        temp = float(self.backend.device_telemetrys[device_idx].get('asic_temperature', '0.0'))
+        temp = self._safe_float(self.backend.device_telemetrys[device_idx].get('asic_temperature', '0.0'))
         
         # Thermal states take precedence
         if temp > 85:
@@ -296,9 +334,9 @@ class TTTopDisplay(Static):
         for i, device in enumerate(self.backend.devices):
             device_name = self.backend.get_device_name(device)[:3].upper()
             telem = self.backend.device_telemetrys[i]
-            power = float(telem.get('power', '0.0'))
-            temp = float(telem.get('asic_temperature', '0.0'))
-            current = float(telem.get('current', '0.0'))
+            power = self._safe_float(telem.get('power', '0.0'))
+            temp = self._safe_float(telem.get('asic_temperature', '0.0'))
+            current = self._safe_float(telem.get('current', '0.0'))
 
             # Create memory hierarchy visualization for this device
             memory_display = self._create_device_memory_matrix(i, device_name, power, current)
@@ -1114,11 +1152,11 @@ class TTTopDisplay(Static):
 
         try:
             # Get current average hardware utilization across all devices
-            total_power = sum(float(self.backend.device_telemetrys[i].get('power', '0'))
+            total_power = sum(self._safe_float(self.backend.device_telemetrys[i].get('power', '0'))
                             for i in range(len(self.backend.devices)))
             avg_power = total_power / max(len(self.backend.devices), 1)
 
-            total_current = sum(float(self.backend.device_telemetrys[i].get('current', '0'))
+            total_current = sum(self._safe_float(self.backend.device_telemetrys[i].get('current', '0'))
                               for i in range(len(self.backend.devices)))
             avg_current = total_current / max(len(self.backend.devices), 1)
 
@@ -1300,8 +1338,8 @@ class TTTopDisplay(Static):
         for i, device in enumerate(self.backend.devices):
             device_name = self.backend.get_device_name(device)[:3].upper()
             telem = self.backend.device_telemetrys[i]
-            power = float(telem.get('power', '0.0'))
-            temp = float(telem.get('asic_temperature', '0.0'))
+            power = self._safe_float(telem.get('power', '0.0'))
+            temp = self._safe_float(telem.get('asic_temperature', '0.0'))
 
             # Get real DDR information from backend
             try:
@@ -1343,7 +1381,7 @@ class TTTopDisplay(Static):
             lines.append(line)
 
             # Show real memory bandwidth based on current telemetry
-            current = float(telem.get('current', '0.0'))
+            current = self._safe_float(telem.get('current', '0.0'))
             bandwidth = min(int(current / 5), 40)  # Scale to line width
             flow_line = self._create_data_flow_line(bandwidth, i)
             lines.append(f"│  MEM: {flow_line[:40]:40} │")
@@ -1451,8 +1489,8 @@ class TTTopDisplay(Static):
             heatmap_line = self._create_heatmap_line(activity_history)
 
             # Current values
-            power = float(telem.get('power', '0.0'))
-            temp = float(telem.get('asic_temperature', '0.0'))
+            power = self._safe_float(telem.get('power', '0.0'))
+            temp = self._safe_float(telem.get('asic_temperature', '0.0'))
 
             line = f"│{device_name:10} {heatmap_line} {power:5.1f}W│"
             lines.append(line)
@@ -1507,8 +1545,8 @@ class TTTopDisplay(Static):
                     telem_i = self.backend.device_telemetrys[i]
                     telem_j = self.backend.device_telemetrys[j]
 
-                    current_i = float(telem_i.get('current', '0.0'))
-                    current_j = float(telem_j.get('current', '0.0'))
+                    current_i = self._safe_float(telem_i.get('current', '0.0'))
+                    current_j = self._safe_float(telem_j.get('current', '0.0'))
 
                     # Simulate interconnect activity
                     bandwidth = min(abs(current_i - current_j) * 2, 99)
@@ -1546,10 +1584,10 @@ class TTTopDisplay(Static):
             device_name = self.backend.get_device_name(device)[:8]
             telem = self.backend.device_telemetrys[i]
 
-            power = float(telem.get('power', '0.0'))
-            voltage = float(telem.get('voltage', '0.0'))
-            current = float(telem.get('current', '0.0'))
-            temp = float(telem.get('asic_temperature', '0.0'))
+            power = self._safe_float(telem.get('power', '0.0'))
+            voltage = self._safe_float(telem.get('voltage', '0.0'))
+            current = self._safe_float(telem.get('current', '0.0'))
+            temp = self._safe_float(telem.get('asic_temperature', '0.0'))
 
             # Calculate insights not available in static tabs
             efficiency = (power / max(temp - 25, 1)) if temp > 25 else 0  # Power per degree above ambient
@@ -1622,10 +1660,10 @@ class TTTopDisplay(Static):
             board_type = self.backend.device_infos[i].get('board_type', 'Unknown')
             telem = self.backend.device_telemetrys[i]
 
-            power = float(telem.get('power', '0.0'))
-            temp = float(telem.get('asic_temperature', '0.0'))
-            current = float(telem.get('current', '0.0'))
-            voltage = float(telem.get('voltage', '0.0'))
+            power = self._safe_float(telem.get('power', '0.0'))
+            temp = self._safe_float(telem.get('asic_temperature', '0.0'))
+            current = self._safe_float(telem.get('current', '0.0'))
+            voltage = self._safe_float(telem.get('voltage', '0.0'))
 
             # Activity indicators with sick symbols
             if power > 50:
@@ -1697,10 +1735,10 @@ class TTTopDisplay(Static):
             board_type = self.backend.device_infos[i].get('board_type', 'N/A')[:6]
             telem = self.backend.device_telemetrys[i]
 
-            voltage = float(telem.get('voltage', '0.0'))
-            current = float(telem.get('current', '0.0'))
-            power = float(telem.get('power', '0.0'))
-            temp = float(telem.get('asic_temperature', '0.0'))
+            voltage = self._safe_float(telem.get('voltage', '0.0'))
+            current = self._safe_float(telem.get('current', '0.0'))
+            power = self._safe_float(telem.get('power', '0.0'))
+            temp = self._safe_float(telem.get('asic_temperature', '0.0'))
 
             # Status with sick symbols
             if temp > 85:
@@ -1760,10 +1798,10 @@ class TTTopDisplay(Static):
 
             # Get current telemetry
             telem = self.backend.device_telemetrys[i]
-            voltage = float(telem.get('voltage', '0.0'))
-            current = float(telem.get('current', '0.0'))
-            temp = float(telem.get('asic_temperature', '0.0'))
-            power = float(telem.get('power', '0.0'))
+            voltage = self._safe_float(telem.get('voltage', '0.0'))
+            current = self._safe_float(telem.get('current', '0.0'))
+            temp = self._safe_float(telem.get('asic_temperature', '0.0'))
+            power = self._safe_float(telem.get('power', '0.0'))
 
             # Activity symbol (plain text)
             if power > 50:
@@ -1816,7 +1854,7 @@ class TTTopDisplay(Static):
 
         for i, device in enumerate(self.backend.devices):
             telem = self.backend.device_telemetrys[i]
-            current = float(telem.get('current', '0.0'))
+            current = self._safe_float(telem.get('current', '0.0'))
 
             # Create flow indicators
             flow_intensity = min(int(current / 10), 10)
@@ -1876,11 +1914,11 @@ class TTTopDisplay(Static):
             board_type = self.backend.device_infos[i].get('board_type', 'N/A')[:6]
             telem = self.backend.device_telemetrys[i]
 
-            voltage = float(telem.get('voltage', '0.0'))
-            current = float(telem.get('current', '0.0'))
-            power = float(telem.get('power', '0.0'))
-            temp = float(telem.get('asic_temperature', '0.0'))
-            aiclk = int(float(telem.get('aiclk', '0')))
+            voltage = self._safe_float(telem.get('voltage', '0.0'))
+            current = self._safe_float(telem.get('current', '0.0'))
+            power = self._safe_float(telem.get('power', '0.0'))
+            temp = self._safe_float(telem.get('asic_temperature', '0.0'))
+            aiclk = int(self._safe_float(telem.get('aiclk', '0')))
 
             # Determine status using systematic method
             status = self._get_device_status_text(i)
@@ -1931,9 +1969,9 @@ class TTTopDisplay(Static):
             avg_temp, total_power = 0, 0
         else:
             # Get average temperature and power across all devices
-            avg_temp = sum(float(self.backend.device_telemetrys[i].get('asic_temperature', '0'))
+            avg_temp = sum(self._safe_float(self.backend.device_telemetrys[i].get('asic_temperature', '0'))
                           for i in range(total_devices)) / total_devices
-            total_power = sum(float(self.backend.device_telemetrys[i].get('power', '0'))
+            total_power = sum(self._safe_float(self.backend.device_telemetrys[i].get('power', '0'))
                              for i in range(total_devices))
 
             if avg_temp > 80:
@@ -1971,10 +2009,10 @@ class TTTopDisplay(Static):
             board_type = self.backend.device_infos[i].get('board_type', 'Unknown')[:8]
             telem = self.backend.device_telemetrys[i]
 
-            power = float(telem.get('power', '0.0'))
-            temp = float(telem.get('asic_temperature', '0.0'))
-            current = float(telem.get('current', '0.0'))
-            voltage = float(telem.get('voltage', '0.0'))
+            power = self._safe_float(telem.get('power', '0.0'))
+            temp = self._safe_float(telem.get('asic_temperature', '0.0'))
+            current = self._safe_float(telem.get('current', '0.0'))
+            voltage = self._safe_float(telem.get('voltage', '0.0'))
 
             # Get systematic status indicators
             status_block, status_icon = self._get_status_indicator(power)
@@ -2075,8 +2113,8 @@ class TTTopDisplay(Static):
         lines.append("")
         total_devices = len(self.backend.devices)
         active_devices = sum(1 for i in range(total_devices)
-                           if float(self.backend.device_telemetrys[i].get('heartbeat', '0')) > 0)
-        total_power = sum(float(self.backend.device_telemetrys[i].get('power', '0'))
+                           if self._safe_float(self.backend.device_telemetrys[i].get('heartbeat', '0')) > 0)
+        total_power = sum(self._safe_float(self.backend.device_telemetrys[i].get('power', '0'))
                          for i in range(total_devices))
 
         # Get real ARC firmware health status from telemetry
@@ -2090,9 +2128,9 @@ class TTTopDisplay(Static):
                 pass
 
         # Calculate real system metrics from telemetry
-        avg_temp = sum(float(self.backend.device_telemetrys[i].get('asic_temperature', '0'))
+        avg_temp = sum(self._safe_float(self.backend.device_telemetrys[i].get('asic_temperature', '0'))
                       for i in range(total_devices)) / max(total_devices, 1)
-        avg_aiclk = sum(float(self.backend.device_telemetrys[i].get('aiclk', '0'))
+        avg_aiclk = sum(self._safe_float(self.backend.device_telemetrys[i].get('aiclk', '0'))
                        for i in range(total_devices)) / max(total_devices, 1)
 
         lines.append("[bright_cyan]┌─ [bold bright_white]HARDWARE STATUS[/bold bright_white] ────── [bright_cyan]┌─ [bold bright_white]MEMORY STATUS[/bold bright_white] ──── [bright_cyan]┌─ [bold bright_white]SYSTEM METRICS[/bold bright_white][/bright_cyan]")
@@ -2125,7 +2163,7 @@ class TTTopDisplay(Static):
         for i, device in enumerate(self.backend.devices):
             device_name = self.backend.get_device_name(device)[:10]
             telem = self.backend.device_telemetrys[i]
-            power = float(telem.get('power', '0.0'))
+            power = self._safe_float(telem.get('power', '0.0'))
 
             # Generate VIBRANT heatmap based on current power
             # In real implementation, this would use a rolling buffer of historical power data
@@ -2197,8 +2235,8 @@ class TTTopDisplay(Static):
                     # Calculate bandwidth simulation
                     telem_i = self.backend.device_telemetrys[i]
                     telem_j = self.backend.device_telemetrys[j]
-                    current_i = float(telem_i.get('current', '0.0'))
-                    current_j = float(telem_j.get('current', '0.0'))
+                    current_i = self._safe_float(telem_i.get('current', '0.0'))
+                    current_j = self._safe_float(telem_j.get('current', '0.0'))
 
                     bandwidth = min(abs(current_i - current_j) * 2, 99)
 
@@ -2236,12 +2274,12 @@ class TTTopDisplay(Static):
             device_name = self.backend.get_device_name(device)[:3].upper()
             telem = self.backend.device_telemetrys[i]
 
-            power = float(telem.get('power', '0.0'))
-            temp = float(telem.get('asic_temperature', '0.0'))
-            current = float(telem.get('current', '0.0'))
-            voltage = float(telem.get('voltage', '0.0'))
-            aiclk = float(telem.get('aiclk', '0.0'))
-            heartbeat = float(telem.get('heartbeat', '0'))
+            power = self._safe_float(telem.get('power', '0.0'))
+            temp = self._safe_float(telem.get('asic_temperature', '0.0'))
+            current = self._safe_float(telem.get('current', '0.0'))
+            voltage = self._safe_float(telem.get('voltage', '0.0'))
+            aiclk = self._safe_float(telem.get('aiclk', '0.0'))
+            heartbeat = self._safe_float(telem.get('heartbeat', '0'))
 
             # Generate hardware events based on current telemetry state
             timestamp_offset = (self.animation_frame + i) % 60
