@@ -165,14 +165,34 @@ class TTTopApp(App[None]):
 
         Returns scrollable container with:
         - Multi-device grid (responsive columns)
+        - Memory hierarchy visualizations (DDR/L2/L1 SRAM)
         - Auto-sizing cards (height: auto)
         - Native borders (no custom ASCII)
         """
+        from tt_top.widgets.memory_hierarchy_card import MemoryHierarchyCard
+        from textual.widgets import Static
+
         container = VerticalScroll(id="organic_layout")
 
-        # Add multi-device grid
+        # Add multi-device grid (telemetry cards)
         grid = MultiDeviceGrid(backend=self.backend, id="device_grid")
         container.mount(grid)
+
+        # Add section header for memory hierarchy
+        header = Static("[bold bright_magenta]Memory Hierarchy & SRAM Visualization[/]",
+                       classes="section-header")
+        container.mount(header)
+
+        # Add memory hierarchy cards for each device
+        num_devices = len(self.backend.devices)
+        for i in range(num_devices):
+            mem_card = MemoryHierarchyCard(
+                backend=self.backend,
+                device_idx=i,
+                compact=(num_devices > 2),  # Compact if more than 2 devices
+                id=f"memory_card_{i}"
+            )
+            container.mount(mem_card)
 
         return container
 
@@ -249,8 +269,10 @@ class TTTopApp(App[None]):
         """Enter full-screen animated visualization mode"""
         self.visualization_mode = True
 
-        # Hide live monitor
-        if self.live_monitor:
+        # Hide current active layout
+        if self.layout_mode == "organic" and self.organic_layout:
+            self.organic_layout.display = False
+        elif self.live_monitor:
             self.live_monitor.display = False
 
         # Create and mount animated display (back to complex version)
@@ -267,7 +289,7 @@ class TTTopApp(App[None]):
         self.sub_title = "Hardware-Responsive Animated Visualization (Press 'v' to exit)"
 
     def _exit_visualization_mode(self) -> None:
-        """Exit visualization mode and return to normal monitor"""
+        """Exit visualization mode and return to active layout"""
         self.visualization_mode = False
 
         # Remove animated display
@@ -275,12 +297,15 @@ class TTTopApp(App[None]):
             self.animated_display.remove()
             self.animated_display = None
 
-        # Show live monitor
-        if self.live_monitor:
+        # Show previously active layout
+        if self.layout_mode == "organic" and self.organic_layout:
+            self.organic_layout.display = True
+            self.sub_title = "Organic Layout - Textual-Native Responsive Design"
+        elif self.live_monitor:
             self.live_monitor.display = True
-
-        # Restore subtitle
-        self.sub_title = "Real-time telemetry and hardware visualization"
+            self.sub_title = "Classic Layout - ASCII Art Rendering"
+        else:
+            self.sub_title = "Real-time telemetry and hardware visualization"
 
     def action_scroll_up(self) -> None:
         """Scroll up in active layout"""
