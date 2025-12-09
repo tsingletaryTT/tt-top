@@ -32,6 +32,7 @@ from tt_top.json_backend_adapter import JSONBackendAdapter
 from tt_top.tt_top_widget import TTLiveMonitor
 from tt_top.animated_display import HardwareResponsiveASCII
 from tt_top.simple_animated_display import SimpleHardwareDisplay
+from tt_top.hero_viz_display import HeroVisualizationDisplay
 
 # New organic layout system
 from tt_top.layouts.organic_layout import OrganicLayout
@@ -257,19 +258,19 @@ class TTTopApp(App[None]):
         elif self.live_monitor:
             self.live_monitor.display = False
 
-        # Create and mount animated display (back to complex version)
-        self.animated_display = HardwareResponsiveASCII(
+        # Create and mount hero cursor visualization (isolated containers prevent markup errors)
+        self.animated_display = HeroVisualizationDisplay(
             backend=self.backend,
             refresh_rate=self.refresh_rate,
             id="animated_display"
         )
         self.mount(self.animated_display)
 
-        # Set focus to animated display to enable 'w' key binding
+        # Set focus to animated display to enable key bindings
         self.animated_display.focus()
 
         # Update subtitle to show mode
-        self.sub_title = "Hardware-Responsive Animated Visualization (Press 'v' to exit)"
+        self.sub_title = "Hero Cursor Visualization - ▶ shows most active device (Press 'v' to exit)"
 
     def _exit_visualization_mode(self) -> None:
         """Exit visualization mode and return to active layout"""
