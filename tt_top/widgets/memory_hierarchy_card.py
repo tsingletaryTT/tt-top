@@ -53,6 +53,7 @@ class MemoryHierarchyCard(Static):
         backend: Any,
         device_idx: int,
         compact: bool = False,
+        refresh_rate: float = 0.05,
         **kwargs
     ):
         """
@@ -62,19 +63,22 @@ class MemoryHierarchyCard(Static):
             backend: JSONBackendAdapter or compatible backend
             device_idx: Device index in backend.devices
             compact: If True, use compact layout
+            refresh_rate: Display refresh rate in seconds (default: 0.05 = 20 FPS)
             **kwargs: Additional arguments for Static widget
         """
         super().__init__(**kwargs)
         self.backend = backend
         self.device_idx = device_idx
         self.compact = compact
+        self.refresh_rate = refresh_rate
+        self.update_timer = None  # Store timer handle for dynamic updates
 
         if compact:
             self.add_class("-compact")
 
     def on_mount(self) -> None:
         """Set up automatic refresh on mount"""
-        self.set_interval(0.1, self.refresh)  # 10 FPS refresh to match device cards
+        self.update_timer = self.set_interval(self.refresh_rate, self.refresh)
 
     def render(self) -> RenderableType:
         """
@@ -299,3 +303,17 @@ class MemoryHierarchyCard(Static):
             color = "bright_green"
 
         return f"[{color}]{'█' * filled}[/][dim white]{'░' * empty}[/]"
+
+    def update_refresh_rate(self, refresh_rate: float) -> None:
+        """
+        Update refresh rate for memory hierarchy updates
+
+        Args:
+            refresh_rate: New refresh rate in seconds
+        """
+        self.refresh_rate = refresh_rate
+
+        # Cancel existing timer and create new one with updated rate
+        if self.update_timer:
+            self.update_timer.stop()
+        self.update_timer = self.set_interval(self.refresh_rate, self.refresh)

@@ -40,11 +40,12 @@ class TTTopDisplay(Static):
     More compatible across Textual versions.
     """
 
-    def __init__(self, backend: Any, **kwargs):  # JSONBackendAdapter or compatible
+    def __init__(self, backend: Any, refresh_rate: float = 0.05, **kwargs):  # JSONBackendAdapter or compatible
         super().__init__(**kwargs)
         self.backend = backend
         self.animation_frame = 0
         self.start_time = time.time()  # Track when the display was created
+        self.refresh_rate = refresh_rate  # Base refresh rate in seconds
 
         # Workload detection debug statistics
         self._workload_debug_stats = {'total_procs': 0, 'python_procs': 0, 'pattern_matches': 0, 'high_resource': 0}
@@ -111,9 +112,8 @@ class TTTopDisplay(Static):
             self.set_timer(safe_interval, self._update_display)
 
         except Exception as e:
-            # Fallback to fixed interval on error
-            from tt_top import constants
-            self.set_timer(constants.GUI_INTERVAL_TIME, self._update_display)
+            # Fallback to configured refresh rate on error
+            self.set_timer(self.refresh_rate, self._update_display)
 
     def _update_display(self) -> None:
         """Update the display with current data using dynamic safety-aware polling
@@ -138,6 +138,21 @@ class TTTopDisplay(Static):
             # Always schedule next update with dynamic interval
             # This creates continuous adaptive polling that responds to workload changes
             self._schedule_safe_update()
+
+    def update_refresh_rate(self, refresh_rate: float) -> None:
+        """
+        Update the base refresh rate for the display
+
+        Args:
+            refresh_rate: New base refresh rate in seconds
+
+        Note: The safety coordinator may still adjust the actual polling
+        interval based on workload and hardware state. This sets the
+        baseline rate used when safety coordinator is unavailable.
+        """
+        self.refresh_rate = refresh_rate
+        # Trigger immediate reschedule with new rate
+        self._schedule_safe_update()
 
     def _should_show_logo(self) -> bool:
         """Check if logo should be displayed (only for first 5 seconds)"""
@@ -2348,9 +2363,10 @@ class TTLiveMonitor(Container):
         Binding("end", "scroll_end", "Go to Bottom", show=False),
     ]
 
-    def __init__(self, backend: Any, **kwargs):  # JSONBackendAdapter or compatible
+    def __init__(self, backend: Any, refresh_rate: float = 0.05, **kwargs):  # JSONBackendAdapter or compatible
         super().__init__(**kwargs)
         self.backend = backend
+        self.refresh_rate = refresh_rate
 
     def compose(self) -> ComposeResult:
         """Compose the scrollable live monitor layout
@@ -2359,7 +2375,24 @@ class TTLiveMonitor(Container):
         and additional hardware insights that exceed typical terminal dimensions.
         """
         with ScrollView(id="tt_top_scroll"):
-            yield TTTopDisplay(backend=self.backend, id="tt_top_display")
+            yield TTTopDisplay(backend=self.backend, refresh_rate=self.refresh_rate, id="tt_top_display")
+
+    def update_refresh_rate(self, refresh_rate: float) -> None:
+        """
+        Update refresh rate for the live monitor display
+
+        Args:
+            refresh_rate: New refresh rate in seconds
+        """
+        self.refresh_rate = refresh_rate
+
+        # Update the TTTopDisplay child widget
+        try:
+            display = self.query_one("#tt_top_display", TTTopDisplay)
+            if display and hasattr(display, 'update_refresh_rate'):
+                display.update_refresh_rate(refresh_rate)
+        except:
+            pass  # Silently continue if widget not found
 
     def action_scroll_up(self) -> None:
         """Scroll up by one line"""

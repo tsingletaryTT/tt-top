@@ -105,6 +105,9 @@ class TTTopApp(App[None]):
         Binding("v", "toggle_visualization", "Toggle Visualization", priority=True),
         Binding("1", "switch_layout('classic')", "Classic Layout", priority=True),
         Binding("2", "switch_layout('organic')", "Organic Layout", priority=True),
+        Binding("+", "increase_refresh_rate", "Faster Refresh", priority=True),
+        Binding("=", "increase_refresh_rate", "Faster Refresh", show=False),
+        Binding("-", "decrease_refresh_rate", "Slower Refresh", priority=True),
         Binding("ctrl+c", "quit", "Quit", show=False),
         Binding("escape", "exit_mode", "Exit Mode", show=False),
         # Scrolling bindings for the live monitor
@@ -116,12 +119,13 @@ class TTTopApp(App[None]):
         Binding("end", "scroll_end", "End", show=False),
     ]
 
-    def __init__(self, backend: JSONBackendAdapter, layout_mode: str = "organic", **kwargs) -> None:
+    def __init__(self, backend: JSONBackendAdapter, layout_mode: str = "organic", refresh_rate: float = 0.05, **kwargs) -> None:
         """Initialize TT-Top application with JSON backend
 
         Args:
             backend: JSONBackendAdapter instance for device communication
             layout_mode: Initial layout mode ('classic' or 'organic')
+            refresh_rate: Display refresh rate in seconds (default: 0.05 = 20 FPS)
             **kwargs: Additional arguments passed to parent App
         """
         super().__init__(**kwargs)
@@ -131,6 +135,9 @@ class TTTopApp(App[None]):
         self.organic_layout: Optional[OrganicLayout] = None
         self.visualization_mode = False
         self.layout_mode = layout_mode  # 'classic' or 'organic'
+        self.refresh_rate = refresh_rate  # Display update interval in seconds
+        self.min_refresh_rate = 0.016  # Minimum 16ms (60 FPS)
+        self.max_refresh_rate = 1.0    # Maximum 1s (1 FPS)
 
     def compose(self) -> ComposeResult:
         """Compose the TT-Top application layout
@@ -145,12 +152,12 @@ class TTTopApp(App[None]):
             yield self.organic_layout
 
             # Create classic layout hidden
-            self.live_monitor = TTLiveMonitor(backend=self.backend)
+            self.live_monitor = TTLiveMonitor(backend=self.backend, refresh_rate=self.refresh_rate)
             self.live_monitor.display = False
             yield self.live_monitor
         else:
             # Classic ASCII art layout
-            self.live_monitor = TTLiveMonitor(backend=self.backend)
+            self.live_monitor = TTLiveMonitor(backend=self.backend, refresh_rate=self.refresh_rate)
             yield self.live_monitor
 
             # Create organic layout hidden
@@ -169,7 +176,7 @@ class TTTopApp(App[None]):
         - Auto-sizing cards (height: auto)
         - Native borders (no custom ASCII)
         """
-        return OrganicLayout(backend=self.backend, id="organic_layout")
+        return OrganicLayout(backend=self.backend, refresh_rate=self.refresh_rate, id="organic_layout")
 
     def on_mount(self) -> None:
         """Handle application mounting
@@ -253,6 +260,7 @@ class TTTopApp(App[None]):
         # Create and mount animated display (back to complex version)
         self.animated_display = HardwareResponsiveASCII(
             backend=self.backend,
+            refresh_rate=self.refresh_rate,
             id="animated_display"
         )
         self.mount(self.animated_display)
@@ -392,6 +400,44 @@ All animations and colors are driven by actual hardware telemetry data.
         if self.live_monitor:
             self.live_monitor.action_scroll_end()
 
+    def action_increase_refresh_rate(self) -> None:
+        """Increase refresh rate (decrease interval) for faster updates"""
+        # Decrease interval by 20% (faster refresh)
+        new_rate = self.refresh_rate * 0.8
+        if new_rate < self.min_refresh_rate:
+            new_rate = self.min_refresh_rate
+            logger.info(f"Refresh rate at maximum: {1/new_rate:.1f} FPS")
+        else:
+            self.refresh_rate = new_rate
+            logger.info(f"Increased refresh rate to {1/new_rate:.1f} FPS ({new_rate*1000:.1f}ms)")
+            self._update_all_refresh_rates()
+
+    def action_decrease_refresh_rate(self) -> None:
+        """Decrease refresh rate (increase interval) for slower updates"""
+        # Increase interval by 25% (slower refresh)
+        new_rate = self.refresh_rate * 1.25
+        if new_rate > self.max_refresh_rate:
+            new_rate = self.max_refresh_rate
+            logger.info(f"Refresh rate at minimum: {1/new_rate:.1f} FPS")
+        else:
+            self.refresh_rate = new_rate
+            logger.info(f"Decreased refresh rate to {1/new_rate:.1f} FPS ({new_rate*1000:.1f}ms)")
+            self._update_all_refresh_rates()
+
+    def _update_all_refresh_rates(self) -> None:
+        """Update refresh rate for all active widgets"""
+        # Update organic layout if it exists
+        if self.organic_layout and hasattr(self.organic_layout, 'update_refresh_rate'):
+            self.organic_layout.update_refresh_rate(self.refresh_rate)
+
+        # Update live monitor if it exists
+        if self.live_monitor and hasattr(self.live_monitor, 'update_refresh_rate'):
+            self.live_monitor.update_refresh_rate(self.refresh_rate)
+
+        # Update animated display if it exists
+        if self.animated_display and hasattr(self.animated_display, 'update_refresh_rate'):
+            self.animated_display.update_refresh_rate(self.refresh_rate)
+
     def on_key(self, event: events.Key) -> None:
         """Handle additional key events"""
         # The parent App class handles key bindings automatically via BINDINGS
@@ -466,6 +512,15 @@ For more information, visit: https://github.com/tenstorrent/tt-top
         "--mock",
         action="store_true",
         help="Use mock data mode (for testing without tt-smi or hardware)",
+    )
+
+    # Display options
+    parser.add_argument(
+        "--refresh-rate",
+        type=float,
+        default=0.05,
+        metavar="SECONDS",
+        help="Display refresh rate in seconds (default: 0.05 = 20 FPS, min: 0.016 = 60 FPS, max: 1.0 = 1 FPS)",
     )
 
     # Version information
@@ -561,7 +616,8 @@ def tt_top_main() -> int:
 
         # Launch the TT-Top application
         logger.info("Launching TT-Top visualization interface")
-        app = TTTopApp(backend=backend)
+        logger.info(f"Refresh rate: {1/args.refresh_rate:.1f} FPS ({args.refresh_rate*1000:.1f}ms)")
+        app = TTTopApp(backend=backend, refresh_rate=args.refresh_rate)
         app.run()
 
         logger.info("TT-Top session completed")

@@ -45,16 +45,19 @@ class MultiDeviceGrid(Grid):
     }
     """
 
-    def __init__(self, backend: Any, **kwargs):
+    def __init__(self, backend: Any, refresh_rate: float = 0.05, **kwargs):
         """
         Initialize multi-device grid
 
         Args:
             backend: JSONBackendAdapter or compatible backend
+            refresh_rate: Display refresh rate in seconds (default: 0.05 = 20 FPS)
             **kwargs: Additional arguments for Grid container
         """
         super().__init__(**kwargs)
         self.backend = backend
+        self.refresh_rate = refresh_rate
+        self.update_timer = None  # Store timer handle for dynamic updates
 
     def compose(self) -> ComposeResult:
         """
@@ -110,7 +113,7 @@ class MultiDeviceGrid(Grid):
 
     def on_mount(self) -> None:
         """Update telemetry on mount"""
-        self.set_interval(0.1, self._update_telemetry)  # 10 FPS
+        self.update_timer = self.set_interval(self.refresh_rate, self._update_telemetry)
 
     def _update_telemetry(self) -> None:
         """Update all device cards with latest telemetry"""
@@ -125,3 +128,17 @@ class MultiDeviceGrid(Grid):
         except Exception:
             # Silently continue on errors (backend handles logging)
             pass
+
+    def update_refresh_rate(self, refresh_rate: float) -> None:
+        """
+        Update refresh rate for telemetry updates
+
+        Args:
+            refresh_rate: New refresh rate in seconds
+        """
+        self.refresh_rate = refresh_rate
+
+        # Cancel existing timer and create new one with updated rate
+        if self.update_timer:
+            self.update_timer.stop()
+        self.update_timer = self.set_interval(self.refresh_rate, self._update_telemetry)

@@ -1197,11 +1197,13 @@ class HardwareResponsiveASCII(Static):
         Binding("escape", "exit_visualization", "Exit Visualization", show=False),
     ]
 
-    def __init__(self, backend: Any, **kwargs):  # JSONBackendAdapter or compatible
+    def __init__(self, backend: Any, refresh_rate: float = 0.05, **kwargs):  # JSONBackendAdapter or compatible
         super().__init__(**kwargs)
         self.backend = backend
         self.frame_count = 0
         self.start_time = time.time()
+        self.refresh_rate = refresh_rate
+        self.update_timer = None  # Store timer handle for dynamic updates
 
         # Initialize display dimensions (will be updated on mount)
         self.display_width = 120
@@ -1318,7 +1320,7 @@ Initialization: Starting...
         self.update(init_debug + "[green]Starting animation loop...[/green]")
 
         # Start animation loop
-        self.set_interval(0.1, self._update_animation)  # 10 FPS for smooth animation
+        self.update_timer = self.set_interval(self.refresh_rate, self._update_animation)
 
     def _update_animation(self) -> None:
         """Update animation frame with hardware-responsive data"""
@@ -1379,6 +1381,20 @@ Initialization: Starting...
         print("🔧 DEBUG: Exit visualization called from widget")
         # Signal parent to exit visualization mode
         self.app.exit()
+
+    def update_refresh_rate(self, refresh_rate: float) -> None:
+        """
+        Update refresh rate for animation updates
+
+        Args:
+            refresh_rate: New refresh rate in seconds
+        """
+        self.refresh_rate = refresh_rate
+
+        # Cancel existing timer and create new one with updated rate
+        if self.update_timer:
+            self.update_timer.stop()
+        self.update_timer = self.set_interval(self.refresh_rate, self._update_animation)
 
     def _render_complete_visualization(self) -> str:
         """Render the complete hardware-responsive visualization"""
