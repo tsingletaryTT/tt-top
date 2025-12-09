@@ -3,21 +3,24 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Hero Cursor Hardware Visualization
+Hero Cursor Hardware Visualization with Conway's Game of Life
 
 Roguelike-inspired hardware monitor where a "hero cursor" (▶) moves between
-devices to show active workload location. Each device is isolated in its own
-container to prevent Rich markup errors from propagating.
+devices to show active workload location. Each device runs Conway's Game of Life
+simulation driven by real hardware telemetry - more activity = faster simulation,
+more cell births, more color intensity.
 
 Design Philosophy:
 - Markup isolation: Each device has independent rendering
 - Visual clarity: Hero shows WHERE activity is happening
-- Roguelike aesthetic: Like @ moving in classic roguelikes
+- Living simulation: Conway's Game of Life driven by hardware state
+- Hardware-responsive: Simulation speed, density, colors reflect real telemetry
 - Error containment: Markup issues localized to individual devices
 """
 
 import time
 import math
+import random
 from typing import Any, List, Tuple, Optional
 from textual.app import ComposeResult
 from textual.containers import Grid, Container, VerticalScroll
@@ -25,15 +28,157 @@ from textual.widgets import Static
 from textual.binding import Binding
 
 
+class ConwayGameOfLife:
+    """
+    Conway's Game of Life simulation driven by hardware telemetry
+
+    Rules (modified for hardware responsiveness):
+    - Standard Conway rules for cell survival/birth
+    - Simulation speed based on power consumption
+    - Cell birth probability based on current draw
+    - Cell colors based on temperature (blue→cyan→yellow→red)
+    - Random seeding on power spikes
+    """
+
+    def __init__(self, width: int = 30, height: int = 15):
+        """Initialize Game of Life grid"""
+        self.width = width
+        self.height = height
+        self.grid = [[False for _ in range(width)] for _ in range(height)]
+        self.age = [[0 for _ in range(width)] for _ in range(height)]  # Track cell age for colors
+        self.generation = 0
+
+    def seed_random(self, density: float = 0.3):
+        """Seed grid with random cells"""
+        for y in range(self.height):
+            for x in range(self.width):
+                if random.random() < density:
+                    self.grid[y][x] = True
+                    self.age[y][x] = 0
+
+    def seed_glider(self, x: int, y: int):
+        """Seed a glider pattern (classic Conway shape)"""
+        pattern = [
+            [False, True, False],
+            [False, False, True],
+            [True, True, True]
+        ]
+        for dy, row in enumerate(pattern):
+            for dx, cell in enumerate(row):
+                ny, nx = (y + dy) % self.height, (x + dx) % self.width
+                self.grid[ny][nx] = cell
+                if cell:
+                    self.age[ny][nx] = 0
+
+    def step(self, activity_boost: float = 0.0):
+        """
+        Advance simulation by one generation
+
+        Args:
+            activity_boost: 0.0-1.0, increases birth probability based on hardware activity
+        """
+        new_grid = [[False for _ in range(self.width)] for _ in range(self.height)]
+        new_age = [[0 for _ in range(self.width)] for _ in range(self.height)]
+
+        for y in range(self.height):
+            for x in range(self.width):
+                # Count live neighbors
+                neighbors = 0
+                for dy in [-1, 0, 1]:
+                    for dx in [-1, 0, 1]:
+                        if dy == 0 and dx == 0:
+                            continue
+                        ny, nx = (y + dy) % self.height, (x + dx) % self.width
+                        if self.grid[ny][nx]:
+                            neighbors += 1
+
+                # Conway's rules (modified with activity boost)
+                if self.grid[y][x]:
+                    # Cell is alive
+                    if neighbors in [2, 3]:
+                        new_grid[y][x] = True
+                        new_age[y][x] = self.age[y][x] + 1  # Age increases
+                else:
+                    # Cell is dead
+                    birth_threshold = 3
+                    # Activity boost increases chance of birth with 2 neighbors
+                    if neighbors == birth_threshold or (neighbors == 2 and random.random() < activity_boost):
+                        new_grid[y][x] = True
+                        new_age[y][x] = 0
+
+        self.grid = new_grid
+        self.age = new_age
+        self.generation += 1
+
+    def render_colorful(self, temp: float, hero_location: bool = False) -> str:
+        """
+        Render Game of Life grid with hardware-responsive colors
+
+        Args:
+            temp: Temperature in Celsius (affects cell colors)
+            hero_location: If True, add hero cursor indicator
+
+        Returns:
+            Rich-formatted string with colored cells
+        """
+        lines = []
+
+        # Color palette based on temperature
+        if temp > 75:
+            alive_colors = ['red', 'orange1', 'bright_yellow']
+        elif temp > 60:
+            alive_colors = ['orange1', 'bright_yellow', 'yellow']
+        elif temp > 45:
+            alive_colors = ['bright_yellow', 'bright_green', 'bright_cyan']
+        else:
+            alive_colors = ['bright_cyan', 'bright_blue', 'cyan']
+
+        for y in range(self.height):
+            line_parts = []
+            for x in range(self.width):
+                if self.grid[y][x]:
+                    # Alive cell - color based on age and temperature
+                    age = min(self.age[y][x], len(alive_colors) - 1)
+                    color = alive_colors[age % len(alive_colors)]
+
+                    # Use different characters for visual variety
+                    if self.age[y][x] > 5:
+                        char = '█'  # Old cells
+                    elif self.age[y][x] > 2:
+                        char = '●'  # Middle-aged cells
+                    else:
+                        char = '○'  # Young cells
+
+                    line_parts.append(f'[{color}]{char}[/{color}]')
+                else:
+                    # Dead cell
+                    line_parts.append('[dim white]·[/]')
+
+            lines.append(''.join(line_parts))
+
+        # Add hero indicator at top if this is hero location
+        if hero_location:
+            hero_line = '[bold bright_yellow]' + '▶' * self.width + '[/]'
+            lines.insert(0, hero_line)
+
+        return '\n'.join(lines)
+
+
 class DeviceVisualizationCard(Static):
     """
-    Individual device visualization card with isolated markup rendering
+    Individual device visualization card with Conway's Game of Life
 
     Shows:
     - Device index and architecture
-    - Activity pattern (dots/stars based on power)
+    - Conway's Game of Life simulation (hardware-responsive)
     - Current telemetry readings
     - Hero cursor (▶) when device is most active
+
+    Hardware Response:
+    - Simulation speed: Based on power consumption
+    - Cell birth rate: Based on current draw
+    - Colors: Based on temperature (blue→cyan→yellow→red)
+    - Pattern seeding: Power spikes trigger glider injection
     """
 
     DEFAULT_CSS = """
@@ -52,13 +197,15 @@ class DeviceVisualizationCard(Static):
     }
     """
 
-    def __init__(self, backend: Any, device_idx: int, **kwargs):
+    def __init__(self, backend: Any, device_idx: int, grid_width: int = 30, grid_height: int = 15, **kwargs):
         """
         Initialize device visualization card
 
         Args:
             backend: JSONBackendAdapter or compatible backend
             device_idx: Device index in backend.devices
+            grid_width: Width of Game of Life grid
+            grid_height: Height of Game of Life grid
             **kwargs: Additional arguments for Static widget
         """
         super().__init__(**kwargs)
@@ -66,11 +213,24 @@ class DeviceVisualizationCard(Static):
         self.device_idx = device_idx
         self.is_hero_location = False
 
+        # Conway's Game of Life simulation
+        self.game = ConwayGameOfLife(width=grid_width, height=grid_height)
+        self.game.seed_random(density=0.35)  # Initial seeding
+
+        # Track power for spike detection
+        self.previous_power = 0.0
+        self.simulation_skip_counter = 0  # Skip frames when power is low
+
     def render(self) -> str:
         """
-        Render device visualization with isolated markup
+        Render device visualization with Conway's Game of Life simulation
 
-        Returns plain text with minimal Rich markup to avoid errors.
+        Returns Conway's Game of Life grid with hardware-responsive behavior:
+        - Simulation speed based on power consumption
+        - Cell birth rate based on current draw
+        - Colors based on temperature (blue→cyan→yellow→red)
+        - Glider injection on power spikes
+
         Each device renders independently - errors don't propagate.
         """
         try:
@@ -95,6 +255,32 @@ class DeviceVisualizationCard(Static):
             else:
                 arch = "??"
 
+            # Calculate activity boost from current draw (0-100A mapped to 0-1)
+            # Higher current = more cell births in Conway simulation
+            activity_boost = min(current / 100.0, 1.0)
+
+            # Detect power spikes and inject glider patterns
+            power_change = abs(power - self.previous_power)
+            if power_change > 5.0:  # 5W spike threshold
+                # Inject glider at random position when activity spikes
+                glider_x = random.randint(0, self.game.width - 3)
+                glider_y = random.randint(0, self.game.height - 3)
+                self.game.seed_glider(glider_x, glider_y)
+            self.previous_power = power
+
+            # Step simulation based on power level
+            # Skip frames when device is idle for performance
+            if power > 10.0:  # Device is active - run simulation
+                self.game.step(activity_boost)
+            else:  # Device idle - slow down simulation
+                self.simulation_skip_counter += 1
+                if self.simulation_skip_counter >= 5:  # Step every 5 frames when idle
+                    self.game.step(0.0)  # No activity boost when idle
+                    self.simulation_skip_counter = 0
+
+            # Render Game of Life with temperature-responsive colors
+            game_display = self.game.render_colorful(temp, self.is_hero_location)
+
             lines = []
 
             # Header with hero cursor if active
@@ -103,28 +289,16 @@ class DeviceVisualizationCard(Static):
             else:
                 lines.append(f"[dim]Device {self.device_idx} ({arch})[/]")
 
-            # Activity visualization (3x3 grid of dots/stars)
-            # More power = more filled dots
-            activity_level = min(int((power / 30.0) * 9), 9)  # 0-30W mapped to 0-9 dots
-
-            activity_chars = []
-            for i in range(9):
-                if i < activity_level:
-                    activity_chars.append('●')
-                else:
-                    activity_chars.append('○')
-
-            # 3x3 grid
             lines.append("")
-            lines.append(f"  {activity_chars[0]} {activity_chars[1]} {activity_chars[2]}")
-            lines.append(f"  {activity_chars[3]} {activity_chars[4]} {activity_chars[5]}")
-            lines.append(f"  {activity_chars[6]} {activity_chars[7]} {activity_chars[8]}")
 
-            # Telemetry readings
+            # Conway's Game of Life grid (30×15 cells)
+            lines.append(game_display)
+
             lines.append("")
-            lines.append(f"[bright_yellow]{power:5.1f}W[/]")
-            lines.append(f"[bright_green]{current:5.1f}A[/]")
-            lines.append(f"[bright_cyan]{temp:4.1f}°C[/]")
+
+            # Telemetry readings with generation count
+            lines.append(f"[bright_yellow]{power:5.1f}W[/] [bright_green]{current:5.1f}A[/] [bright_cyan]{temp:4.1f}°C[/]")
+            lines.append(f"[dim]Generation: {self.game.generation}[/]")
 
             return '\n'.join(lines)
 
