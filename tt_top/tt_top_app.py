@@ -259,9 +259,12 @@ class TTTopApp(App[None]):
             self.live_monitor.display = False
 
         # Create and mount hero cursor visualization (isolated containers prevent markup errors)
+        # Use faster refresh rate for visualization mode to make sparkle and color cycling smooth
+        # Visual animation at 30 FPS feels alive, even if telemetry updates slower
+        visual_refresh_rate = 0.033  # 30 FPS for smooth sparkle
         self.animated_display = HeroVisualizationDisplay(
             backend=self.backend,
-            refresh_rate=self.refresh_rate,
+            refresh_rate=visual_refresh_rate,
             id="animated_display"
         )
         self.mount(self.animated_display)
