@@ -1458,7 +1458,11 @@ Press 'v' to exit visualization mode
                     power_change = ((total_power - baseline_total_power) / baseline_total_power * 100) if baseline_total_power > 0 else 0
                     current_change = ((total_current - baseline_total_current) / baseline_total_current * 100) if baseline_total_current > 0 else 0
 
-                    change_info = f"[bright_white]Δ Power:[/bright_white] [{'bright_green' if power_change >= 0 else 'orange1'}]{power_change:+5.1f}%[/{'bright_green' if power_change >= 0 else 'orange1'}] [dim white]│[/dim white] [bright_white]Δ Current:[/bright_white] [{'bright_green' if current_change >= 0 else 'orange1'}]{current_change:+5.1f}%[/{'bright_green' if current_change >= 0 else 'orange1'}]"
+                    # Pre-compute colors to avoid inline conditionals in markup
+                    power_color = 'bright_green' if power_change >= 0 else 'orange1'
+                    current_color = 'bright_green' if current_change >= 0 else 'orange1'
+
+                    change_info = f"[bright_white]Δ Power:[/bright_white] [{power_color}]{power_change:+5.1f}%[/{power_color}] [dim white]│[/dim white] [bright_white]Δ Current:[/bright_white] [{current_color}]{current_change:+5.1f}%[/{current_color}]"
                 else:
                     change_info = "[dim white]No devices detected[/dim white]"
             else:
