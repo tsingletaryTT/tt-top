@@ -1206,6 +1206,29 @@ class HardwareResponsiveASCII(Static):
         self.starfield = HardwareStarfield(self.display_width, self.display_height)
         self.data_streams = FlowingDataStreams(self.display_width, self.display_height)
 
+    @staticmethod
+    def _escape_rich_markup(text: str) -> str:
+        """
+        Escape Rich markup characters in user/system strings to prevent interpretation
+
+        Use this whenever embedding error messages, tracebacks, or any user/system
+        strings into Rich formatted output to prevent strings like '[bright_white]'
+        from being interpreted as actual markup tags.
+
+        Args:
+            text: String that may contain literal brackets that should not be interpreted
+
+        Returns:
+            String with brackets escaped for literal display in Rich markup
+
+        Example:
+            error_msg = self._escape_rich_markup(str(exception))
+            self.update(f"[red]Error: {error_msg}[/red]")
+        """
+        if text is None:
+            return ""
+        return str(text).replace('[', '\\[').replace(']', '\\]')
+
     def on_mount(self) -> None:
         """Initialize hardware-responsive animation systems"""
         # Get actual display size with fallback
@@ -1230,8 +1253,8 @@ Initialization: Starting...
             self.starfield.initialize_stars(self.backend)
             init_debug += f"Stars: {len(self.starfield.stars)} created\n"
         except Exception as e:
-            # Escape error message to prevent Rich markup interpretation
-            error_msg = str(e).replace('[', '\\[').replace(']', '\\]')
+            # Use helper to escape error message
+            error_msg = self._escape_rich_markup(str(e))
             init_debug += f"Star creation error: {error_msg}\n"
 
         self.update(init_debug + "[green]Starting animation loop...[/green]")
@@ -1269,9 +1292,10 @@ Initialization: Starting...
             # Handle errors gracefully with more debug info
             import traceback
             error_details = traceback.format_exc()
-            # Escape Rich markup in error_details to prevent interpretation of code snippets as tags
-            error_details_safe = error_details.replace('[', '\\[').replace(']', '\\]')
-            self.update(f"[red]Animation Error: {e}[/red]\n\nDebug info:\n{error_details_safe}")
+            # Use helper to escape all error strings
+            error_msg = self._escape_rich_markup(str(e))
+            error_details_safe = self._escape_rich_markup(error_details)
+            self.update(f"[red]Animation Error: {error_msg}[/red]\n\nDebug info:\n{error_details_safe}")
 
     def action_trigger_celebration(self) -> None:
         """Trigger workload celebration manually"""
@@ -1352,8 +1376,8 @@ Initialization: Starting...
 
         except Exception as e:
             # Complete fallback
-            # Escape error message to prevent Rich markup interpretation
-            error_msg = str(e).replace('[', '\\[').replace(']', '\\]')
+            # Use helper to escape error message
+            error_msg = self._escape_rich_markup(str(e))
             return f"""
 [red]VISUALIZATION RENDERING ERROR[/red]
 
