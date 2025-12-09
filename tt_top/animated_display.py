@@ -834,6 +834,9 @@ class HardwareStarfield:
             current_color = None
 
             for char, color in zip(char_row, color_row):
+                # Validate color to prevent malformed tags
+                color = HardwareResponsiveASCII._validate_rich_color(color)
+
                 if color != current_color:
                     # Close previous color/bold tags
                     if current_color is not None:
@@ -859,6 +862,8 @@ class HardwareStarfield:
 
             # Close final color tag if needed
             if current_color is not None:
+                # Validate before closing to ensure tag is valid
+                current_color = HardwareResponsiveASCII._validate_rich_color(current_color)
                 if current_color.startswith('bold '):
                     base_color = current_color.replace('bold ', '')
                     line_parts.append(f'[/{base_color}]')
@@ -1228,6 +1233,59 @@ class HardwareResponsiveASCII(Static):
         if text is None:
             return ""
         return str(text).replace('[', '\\[').replace(']', '\\]')
+
+    @staticmethod
+    def _validate_rich_color(color: str) -> str:
+        """
+        Validate and sanitize Rich color names to prevent malformed markup tags
+
+        Ensures color strings are valid Rich color names. Invalid or truncated
+        colors are replaced with a safe default to prevent markup errors.
+
+        Args:
+            color: Color string that may be corrupted or incomplete
+
+        Returns:
+            Valid Rich color name, or 'white' as safe fallback
+
+        Example:
+            safe_color = self._validate_rich_color(star['color'])
+            markup = f"[{safe_color}]text[/{safe_color}]"
+        """
+        if not color or not isinstance(color, str):
+            return 'white'
+
+        # Strip whitespace
+        color = color.strip()
+
+        # Handle compound colors (e.g., 'bold bright_white')
+        parts = color.split()
+        if len(parts) == 2 and parts[0] == 'bold':
+            base_color = parts[1]
+        elif len(parts) == 1:
+            base_color = parts[0]
+        else:
+            # Invalid format
+            return 'white'
+
+        # Validate base color (allow known patterns)
+        valid_prefixes = ['bright_', 'dim_', 'bold_']
+        valid_colors = ['red', 'green', 'blue', 'yellow', 'magenta', 'cyan', 'white',
+                       'orange1', 'orange', 'purple']
+
+        # Check if it's a valid simple color
+        if base_color in valid_colors:
+            return color
+
+        # Check if it's a valid prefixed color
+        for prefix in valid_prefixes:
+            if base_color.startswith(prefix):
+                color_name = base_color[len(prefix):]
+                if color_name in valid_colors:
+                    return color
+
+        # Invalid or incomplete - return safe fallback
+        return 'white'
 
     def on_mount(self) -> None:
         """Initialize hardware-responsive animation systems"""
