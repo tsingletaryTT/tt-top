@@ -1577,8 +1577,17 @@ Press 'v' to exit visualization mode
             baseline_status = "[bright_yellow]INITIALIZING[/bright_yellow]"
             change_info = "[dim white]Starting visualization...[/dim white]"
 
+        # Handle compound status_color properly (e.g., 'bold red')
+        if status_color.startswith('bold '):
+            base_status_color = status_color.replace('bold ', '')
+            status_markup_open = f"[bold][{base_status_color}]"
+            status_markup_close = f"[/{base_status_color}][/bold]"
+        else:
+            status_markup_open = f"[{status_color}]"
+            status_markup_close = f"[/{status_color}]"
+
         lines.append(f"[bright_cyan]╔═══════════════════════════════════════════════════════════════════════════════════════════╗[/bright_cyan]")
-        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_magenta]{pulse_char}[/bold bright_magenta] [bold bright_white]ADAPTIVE HARDWARE VISUALIZATION[/bold bright_white] [dim white]│[/dim white] [{status_color}]{status_text}[/{status_color}] [dim white]│[/dim white] [bright_white]Devices:[/bright_white] {total_devices} [bright_cyan]║[/bright_cyan]")
+        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_magenta]{pulse_char}[/bold bright_magenta] [bold bright_white]ADAPTIVE HARDWARE VISUALIZATION[/bold bright_white] [dim white]│[/dim white] {status_markup_open}{status_text}{status_markup_close} [dim white]│[/dim white] [bright_white]Devices:[/bright_white] {total_devices} [bright_cyan]║[/bright_cyan]")
         lines.append(f"[bright_cyan]║[/bright_cyan] {baseline_status} [dim white]│[/dim white] {change_info} [bright_cyan]║[/bright_cyan]")
         lines.append(f"[bright_cyan]║[/bright_cyan] [bright_white]Absolute:[/bright_white] [orange1]{total_power:5.1f}W[/orange1] [bright_green]{total_current:5.1f}A[/bright_green] [bright_yellow]{avg_temp:4.1f}°C[/bright_yellow] [dim white]│[/dim white] [bright_white]Frame:[/bright_white] [bright_magenta]{self.frame_count}[/bright_magenta] [bright_cyan]║[/bright_cyan]")
         lines.append(f"[bright_cyan]╚═══════════════════════════════════════════════════════════════════════════════════════════╝[/bright_cyan]")
