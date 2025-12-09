@@ -34,7 +34,7 @@ from tt_top.animated_display import HardwareResponsiveASCII
 from tt_top.simple_animated_display import SimpleHardwareDisplay
 
 # New organic layout system
-from tt_top.layouts.multi_device_grid import MultiDeviceGrid
+from tt_top.layouts.organic_layout import OrganicLayout
 
 # Set up logging
 import logging
@@ -128,7 +128,7 @@ class TTTopApp(App[None]):
         self.backend = backend
         self.live_monitor: Optional[TTLiveMonitor] = None
         self.animated_display: Optional[HardwareResponsiveASCII] = None
-        self.organic_layout: Optional[VerticalScroll] = None
+        self.organic_layout: Optional[OrganicLayout] = None
         self.visualization_mode = False
         self.layout_mode = layout_mode  # 'classic' or 'organic'
 
@@ -160,7 +160,7 @@ class TTTopApp(App[None]):
 
         yield Footer()
 
-    def _create_organic_layout(self) -> VerticalScroll:
+    def _create_organic_layout(self) -> OrganicLayout:
         """Create the organic Textual-native layout
 
         Returns scrollable container with:
@@ -169,32 +169,7 @@ class TTTopApp(App[None]):
         - Auto-sizing cards (height: auto)
         - Native borders (no custom ASCII)
         """
-        from tt_top.widgets.memory_hierarchy_card import MemoryHierarchyCard
-        from textual.widgets import Static
-
-        container = VerticalScroll(id="organic_layout")
-
-        # Add multi-device grid (telemetry cards)
-        grid = MultiDeviceGrid(backend=self.backend, id="device_grid")
-        container.mount(grid)
-
-        # Add section header for memory hierarchy
-        header = Static("[bold bright_magenta]Memory Hierarchy & SRAM Visualization[/]",
-                       classes="section-header")
-        container.mount(header)
-
-        # Add memory hierarchy cards for each device
-        num_devices = len(self.backend.devices)
-        for i in range(num_devices):
-            mem_card = MemoryHierarchyCard(
-                backend=self.backend,
-                device_idx=i,
-                compact=(num_devices > 2),  # Compact if more than 2 devices
-                id=f"memory_card_{i}"
-            )
-            container.mount(mem_card)
-
-        return container
+        return OrganicLayout(backend=self.backend, id="organic_layout")
 
     def on_mount(self) -> None:
         """Handle application mounting
