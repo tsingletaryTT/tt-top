@@ -1230,7 +1230,9 @@ Initialization: Starting...
             self.starfield.initialize_stars(self.backend)
             init_debug += f"Stars: {len(self.starfield.stars)} created\n"
         except Exception as e:
-            init_debug += f"Star creation error: {e}\n"
+            # Escape error message to prevent Rich markup interpretation
+            error_msg = str(e).replace('[', '\\[').replace(']', '\\]')
+            init_debug += f"Star creation error: {error_msg}\n"
 
         self.update(init_debug + "[green]Starting animation loop...[/green]")
 
@@ -1267,7 +1269,9 @@ Initialization: Starting...
             # Handle errors gracefully with more debug info
             import traceback
             error_details = traceback.format_exc()
-            self.update(f"[red]Animation Error: {e}[/red]\n\nDebug info:\n{error_details}")
+            # Escape Rich markup in error_details to prevent interpretation of code snippets as tags
+            error_details_safe = error_details.replace('[', '\\[').replace(']', '\\]')
+            self.update(f"[red]Animation Error: {e}[/red]\n\nDebug info:\n{error_details_safe}")
 
     def action_trigger_celebration(self) -> None:
         """Trigger workload celebration manually"""
@@ -1348,10 +1352,12 @@ Initialization: Starting...
 
         except Exception as e:
             # Complete fallback
+            # Escape error message to prevent Rich markup interpretation
+            error_msg = str(e).replace('[', '\\[').replace(']', '\\]')
             return f"""
 [red]VISUALIZATION RENDERING ERROR[/red]
 
-Error: {e}
+Error: {error_msg}
 Frame: {self.frame_count}
 Display: {self.display_width}x{self.display_height}
 Stars: {len(self.starfield.stars) if hasattr(self.starfield, 'stars') else 'unknown'}
@@ -1475,7 +1481,7 @@ Press 'v' to exit visualization mode
 
         lines.append(f"[bright_cyan]╔═══════════════════════════════════════════════════════════════════════════════════════════╗[/bright_cyan]")
         lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_magenta]{pulse_char}[/bold bright_magenta] [bold bright_white]ADAPTIVE HARDWARE VISUALIZATION[/bold bright_white] [dim white]│[/dim white] [{status_color}]{status_text}[/{status_color}] [dim white]│[/dim white] [bright_white]Devices:[/bright_white] {total_devices} [bright_cyan]║[/bright_cyan]")
-        lines.append(f"[bright_cyan]║[/bright_cyan] {baseline_status} [dim white]│[/dim white] {change_info}")
+        lines.append(f"[bright_cyan]║[/bright_cyan] {baseline_status} [dim white]│[/dim white] {change_info} [bright_cyan]║[/bright_cyan]")
         lines.append(f"[bright_cyan]║[/bright_cyan] [bright_white]Absolute:[/bright_white] [orange1]{total_power:5.1f}W[/orange1] [bright_green]{total_current:5.1f}A[/bright_green] [bright_yellow]{avg_temp:4.1f}°C[/bright_yellow] [dim white]│[/dim white] [bright_white]Frame:[/bright_white] [bright_magenta]{self.frame_count}[/bright_magenta] [bright_cyan]║[/bright_cyan]")
         lines.append(f"[bright_cyan]╚═══════════════════════════════════════════════════════════════════════════════════════════╝[/bright_cyan]")
 
@@ -1487,7 +1493,7 @@ Press 'v' to exit visualization mode
 
         lines.append(f"[bright_cyan]╔═══════════════════════════════════════════════════════════════════════════════════════════╗[/bright_cyan]")
         lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_white]COMPONENTS:[/bold bright_white] [bright_cyan]●◉○∘·[/bright_cyan] Tensix Cores [dim white]│[/dim white] [bright_magenta]█▓▒░·[/bright_magenta] Memory Ch [dim white]│[/dim white] [bright_blue]◆[/bright_blue] L1 [bright_yellow]◇[/bright_yellow] L2 [bright_red]♦[/bright_red] DDR [dim white]│[/dim white] [bright_green]✦✧✩[/bright_green] Links [bright_cyan]║[/bright_cyan]")
-        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_white]WORKLOAD DETECTION:[/bold bright_white] Says [bold bright_magenta]🚀 hello[/bold bright_magenta] when activity +{int(hasattr(self, 'starfield') and getattr(self.starfield, 'workload_threshold', 0.20) * 100)}% above baseline")
+        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_white]WORKLOAD DETECTION:[/bold bright_white] Says [bold bright_magenta]🚀 hello[/bold bright_magenta] when activity +{int(hasattr(self, 'starfield') and getattr(self.starfield, 'workload_threshold', 0.20) * 100)}% above baseline [bright_cyan]║[/bright_cyan]")
         lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_white]CONTROLS:[/bold bright_white] Press 'v' to exit [dim white]│[/dim white] Press 'w' to test celebration [dim white]│[/dim white] [bright_green]+10%[/bright_green] [bright_yellow]+25%[/bright_yellow] [orange1]+50%[/orange1] triggers celebration [bright_cyan]║[/bright_cyan]")
         lines.append(f"[bright_cyan]╚═══════════════════════════════════════════════════════════════════════════════════════════╝[/bright_cyan]")
 
