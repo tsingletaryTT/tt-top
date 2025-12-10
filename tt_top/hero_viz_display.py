@@ -208,7 +208,7 @@ class DeviceVisualizationCard(Static):
 
     DeviceVisualizationCard.hero-active {
         border: round $accent;
-        background: $panel;
+        background: #1a0a1f;  /* Dark purple/magenta - complements cyan/magenta sparkle colors */
     }
     """
 
