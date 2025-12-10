@@ -409,7 +409,7 @@ class HeroVisualizationDisplay(Container):
     #hero_header {
         width: 100%;
         padding: 1 2;
-        background: $panel;
+        background: black;
         border: solid $accent;
     }
 
@@ -422,7 +422,7 @@ class HeroVisualizationDisplay(Container):
     #hero_footer {
         width: 100%;
         padding: 1 2;
-        background: $panel;
+        background: black;
     }
     """
 
@@ -575,6 +575,12 @@ class HeroVisualizationDisplay(Container):
         if self.update_timer:
             self.update_timer.stop()
         self.update_timer = self.set_interval(self.refresh_rate, self._update_hero_display)
+
+    def on_unmount(self) -> None:
+        """Cleanup timers when widget is unmounted"""
+        if self.update_timer:
+            self.update_timer.stop()
+            self.update_timer = None
 
     def action_exit_visualization(self) -> None:
         """Exit visualization mode"""

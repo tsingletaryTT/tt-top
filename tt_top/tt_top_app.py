@@ -143,8 +143,8 @@ class TTTopApp(App[None]):
     def compose(self) -> ComposeResult:
         """Compose the TT-Top application layout
 
-        Creates either classic or organic layout based on mode.
-        Supports runtime switching between layouts via key bindings.
+        Creates all layouts upfront and toggles visibility for fast switching.
+        This avoids expensive mount/unmount cycles and timer cleanup issues.
         """
         # Create both layouts, but only show active one
         if self.layout_mode == "organic":
@@ -165,6 +165,16 @@ class TTTopApp(App[None]):
             self.organic_layout = self._create_organic_layout()
             self.organic_layout.display = False
             yield self.organic_layout
+
+        # Create visualization display hidden (created once for fast switching)
+        visual_refresh_rate = 0.033  # 30 FPS for smooth sparkle
+        self.animated_display = HeroVisualizationDisplay(
+            backend=self.backend,
+            refresh_rate=visual_refresh_rate,
+            id="animated_display"
+        )
+        self.animated_display.display = False
+        yield self.animated_display
 
         yield Footer()
 
@@ -249,7 +259,11 @@ class TTTopApp(App[None]):
             logger.info("Switched to classic layout")
 
     def _enter_visualization_mode(self) -> None:
-        """Enter full-screen animated visualization mode"""
+        """Enter full-screen animated visualization mode
+
+        Fast mode switching: Just toggle display property instead of mount/unmount.
+        Widget is created once in compose(), avoiding expensive recreation.
+        """
         self.visualization_mode = True
 
         # Hide current active layout
@@ -258,16 +272,8 @@ class TTTopApp(App[None]):
         elif self.live_monitor:
             self.live_monitor.display = False
 
-        # Create and mount hero cursor visualization (isolated containers prevent markup errors)
-        # Use faster refresh rate for visualization mode to make sparkle and color cycling smooth
-        # Visual animation at 30 FPS feels alive, even if telemetry updates slower
-        visual_refresh_rate = 0.033  # 30 FPS for smooth sparkle
-        self.animated_display = HeroVisualizationDisplay(
-            backend=self.backend,
-            refresh_rate=visual_refresh_rate,
-            id="animated_display"
-        )
-        self.mount(self.animated_display)
+        # Show animated display (already created in compose)
+        self.animated_display.display = True
 
         # Set focus to animated display to enable key bindings
         self.animated_display.focus()
@@ -276,13 +282,16 @@ class TTTopApp(App[None]):
         self.sub_title = "Hero Cursor Visualization - ▶ shows most active device (Press 'v' to exit)"
 
     def _exit_visualization_mode(self) -> None:
-        """Exit visualization mode and return to active layout"""
+        """Exit visualization mode and return to active layout
+
+        Fast mode switching: Just toggle display property instead of mount/unmount.
+        Widget stays alive in background, ready for instant re-entry.
+        """
         self.visualization_mode = False
 
-        # Remove animated display
+        # Hide animated display (keep widget alive for fast re-entry)
         if self.animated_display:
-            self.animated_display.remove()
-            self.animated_display = None
+            self.animated_display.display = False
 
         # Show previously active layout
         if self.layout_mode == "organic" and self.organic_layout:

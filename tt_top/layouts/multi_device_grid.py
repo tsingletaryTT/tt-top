@@ -115,6 +115,12 @@ class MultiDeviceGrid(Grid):
         """Update telemetry on mount"""
         self.update_timer = self.set_interval(self.refresh_rate, self._update_telemetry)
 
+    def on_unmount(self) -> None:
+        """Cleanup timer when widget is unmounted"""
+        if self.update_timer:
+            self.update_timer.stop()
+            self.update_timer = None
+
     def _update_telemetry(self) -> None:
         """Update all device cards with latest telemetry"""
         try:

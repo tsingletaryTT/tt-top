@@ -80,6 +80,12 @@ class MemoryHierarchyCard(Static):
         """Set up automatic refresh on mount"""
         self.update_timer = self.set_interval(self.refresh_rate, self.refresh)
 
+    def on_unmount(self) -> None:
+        """Cleanup timer when widget is unmounted"""
+        if self.update_timer:
+            self.update_timer.stop()
+            self.update_timer = None
+
     def render(self) -> RenderableType:
         """
         Render memory hierarchy visualization
