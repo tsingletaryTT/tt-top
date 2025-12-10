@@ -114,6 +114,9 @@ class ConwayGameOfLife:
         """
         Render Game of Life grid with vibrant, sparkling hardware-responsive colors
 
+        Visual effects run at 30 FPS independent of simulation steps, creating
+        smooth animation even when Game of Life isn't stepping.
+
         Args:
             temp: Temperature in Celsius (affects cell intensity)
             hero_location: If True, add hero cursor indicator
@@ -124,54 +127,80 @@ class ConwayGameOfLife:
         """
         lines = []
 
-        # Vibrant color palette - sparkle and cycle through cyan/purple/magenta
-        # Active cells cycle through these colors, creating alive feeling
+        # Extended color palette for smoother transitions (12 colors vs 6)
+        # Creates buttery smooth color cycling between simulation steps
         sparkle_colors = [
-            'bright_cyan',      # Frame 0, 6, 12...
-            'cyan',             # Frame 1, 7, 13...
-            'bright_magenta',   # Frame 2, 8, 14...
-            'magenta',          # Frame 3, 9, 15...
-            'bright_blue',      # Frame 4, 10, 16...
-            'blue'              # Frame 5, 11, 17...
+            'bright_cyan',      # 0
+            'cyan',             # 1
+            'bright_cyan',      # 2 (pulse back)
+            'bright_blue',      # 3
+            'blue',             # 4
+            'bright_magenta',   # 5
+            'magenta',          # 6
+            'bright_magenta',   # 7 (pulse back)
+            'bright_blue',      # 8
+            'cyan',             # 9
+            'bright_cyan',      # 10
+            'bright_blue'       # 11
         ]
 
         # Temperature adds intensity (hotter = brighter colors in cycle)
         temp_intensity = min(temp / 100.0, 1.0)  # 0-100°C normalized
 
+        # Brightness pulse wave (independent of simulation)
+        # Makes cells breathe/pulse even when Game of Life isn't stepping
+        pulse = math.sin(frame * 0.1) * 0.3 + 0.7  # 0.4 to 1.0 range
+
         for y in range(self.height):
             line_parts = []
             for x in range(self.width):
                 if self.grid[y][x]:
-                    # Alive cell - sparkle and cycle colors
+                    # Alive cell - sparkle and cycle colors with smooth transitions
                     # Each cell has its own phase based on position for shimmer effect
                     cell_phase = (frame + x * 2 + y * 3) % len(sparkle_colors)
                     color = sparkle_colors[cell_phase]
 
-                    # Age affects character brightness
-                    if self.age[y][x] > 5:
-                        # Old cells - solid bright blocks
-                        char = '█'
-                    elif self.age[y][x] > 2:
-                        # Middle cells - filled dots
-                        char = '●'
-                    else:
-                        # Young cells - hollow dots (just born, sparkle effect)
-                        char = '○'
+                    # Age affects character with smooth transitions
+                    # Add intermediate states for smoother visual flow
+                    age = self.age[y][x]
+                    age_cycle = (frame // 2 + x + y) % 4  # Cycle through variations
 
-                    # Hot temperature adds brightness
-                    if temp_intensity > 0.7:
+                    if age > 5:
+                        # Old cells - cycle between solid characters
+                        chars = ['█', '▓', '█', '▓']
+                        char = chars[age_cycle]
+                    elif age > 2:
+                        # Middle cells - cycle between filled variations
+                        chars = ['●', '◉', '●', '◉']
+                        char = chars[age_cycle]
+                    else:
+                        # Young cells - cycle between hollow variations (sparkle effect)
+                        chars = ['○', '◎', '○', '◉']
+                        char = chars[age_cycle]
+
+                    # Apply brightness pulse and temperature effects
+                    # Cells pulse independently, creating living feeling
+                    cell_pulse = pulse + (math.sin((x + y + frame) * 0.2) * 0.2)
+                    use_bold = cell_pulse > 0.8 or temp_intensity > 0.7
+
+                    if use_bold:
                         line_parts.append(f'[bold {color}]{char}[/]')
                     else:
                         line_parts.append(f'[{color}]{char}[/{color}]')
                 else:
-                    # Dead cell - dim dark gray (machine is resting)
-                    line_parts.append('[#3a3a3a]·[/]')
+                    # Dead cell - subtle pulse to show machine is alive
+                    # Even dead cells breathe slightly
+                    dead_pulse = (frame + x + y) % 8
+                    if dead_pulse < 2:
+                        line_parts.append('[#4a4a4a]·[/]')  # Slightly brighter
+                    else:
+                        line_parts.append('[#3a3a3a]·[/]')  # Normal dark
 
             lines.append(''.join(line_parts))
 
         # Add hero indicator at top if this is hero location
         if hero_location:
-            # Hero indicator also sparkles
+            # Hero indicator also sparkles with smooth transitions
             hero_color = sparkle_colors[frame % len(sparkle_colors)]
             hero_line = f'[bold {hero_color}]' + '▶' * self.width + '[/]'
             lines.insert(0, hero_line)
