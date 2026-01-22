@@ -46,10 +46,28 @@ class TTTopDisplay(Static):
         self.animation_frame = 0
         self.start_time = time.time()  # Track when the display was created
 
+        # Adaptive screen size - will be updated on mount
+        self.terminal_width = 120
+        self.terminal_height = 40
+
     def on_mount(self) -> None:
         """Set up dynamic periodic updates with hardware safety coordination"""
+        # Get FULL terminal size - take over the screen!
+        self.terminal_width = max(self.size.width, 80) if hasattr(self, 'size') and self.size else 120
+        self.terminal_height = max(self.size.height, 25) if hasattr(self, 'size') and self.size else 40
+
+        print(f"📐 TT-Top main screen: {self.terminal_width} × {self.terminal_height}")
+
         # Start with initial safety-aware interval instead of fixed interval
         self._schedule_safe_update()
+
+    def on_resize(self, event) -> None:
+        """Handle terminal resize - stay adaptive!"""
+        old_width, old_height = self.terminal_width, self.terminal_height
+        self.terminal_width = max(event.size.width, 80)
+        self.terminal_height = max(event.size.height, 25)
+
+        print(f"📐 TT-Top resized: {old_width}×{old_height} → {self.terminal_width}×{self.terminal_height}")
 
     def _schedule_safe_update(self) -> None:
         """Schedule next update using safety coordinator's recommended interval
@@ -145,6 +163,20 @@ class TTTopDisplay(Static):
     def _colorize_text(self, text: str, color: str) -> str:
         """Apply color markup to text"""
         return f"[{color}]{text}[/{color}]"
+
+    def _create_adaptive_border_top(self, title: str = "", style: str = "bright_cyan") -> str:
+        """Create adaptive top border - BORDERLESS RIGHT for authentic terminal feel"""
+        if title:
+            # ┌─── TITLE ─────────  (no right corner)
+            return f"[{style}]┌─── [bold bright_white]{title}[/bold bright_white] ───────────[/{style}]"
+        else:
+            # ┌─────────────  (no right corner)
+            return f"[{style}]┌─────────────────────────────────────────[/{style}]"
+
+    def _create_adaptive_border_bottom(self, style: str = "bright_cyan") -> str:
+        """Create adaptive bottom border - BORDERLESS RIGHT for authentic terminal feel"""
+        # └─────────────  (no right corner)
+        return f"[{style}]└─────────────────────────────────────────[/{style}]"
 
     def _get_status_indicator(self, power: float) -> tuple[str, str]:
         """Get status block and icon based on power level - returns (block, icon) WITH VIBRANT COLORS"""
@@ -1888,11 +1920,11 @@ class TTTopDisplay(Static):
         return lines
 
     def _create_bbs_main_display(self) -> List[str]:
-        """Create main BBS-style display with terminal aesthetic - borderless right side"""
+        """Create main BBS-style display with terminal aesthetic - ADAPTIVE & FULL SCREEN"""
         lines = []
 
-        # BBS-style system status header (borderless right) with cyberpunk colors
-        lines.append("[bright_cyan]┌─────────────────────────── [bold bright_white]SYSTEM STATUS[/bold bright_white][/bright_cyan]")
+        # Adaptive system status header that fills terminal width
+        lines.append(self._create_adaptive_border_top("SYSTEM STATUS"))
         lines.append("[bright_cyan]│[/bright_cyan]")
 
         # Hardware grid in retro style with colors
@@ -1976,10 +2008,12 @@ class TTTopDisplay(Static):
             lines.append(activity_line)
 
             if i < len(self.backend.devices) - 1:
-                lines.append("[bright_cyan]│[/bright_cyan] [dim white]·······································································[/dim white]")
+                # Adaptive separator dots
+                dots = "·" * (self.terminal_width - 3)
+                lines.append(f"[bright_cyan]│[/bright_cyan] [dim white]{dots}[/dim white]")
 
         lines.append("[bright_cyan]│[/bright_cyan]")
-        lines.append("[bright_cyan]└───────────────────────────────────────────────────────────────────────[/bright_cyan]")
+        lines.append(self._create_adaptive_border_bottom())
 
         # Add temporal heatmap section in BBS style
         lines.append("")
@@ -2025,7 +2059,8 @@ class TTTopDisplay(Static):
         avg_aiclk = sum(float(self.backend.device_telemetrys[i].get('aiclk', '0'))
                        for i in range(total_devices)) / max(total_devices, 1)
 
-        lines.append("[bright_cyan]┌─ [bold bright_white]HARDWARE STATUS[/bold bright_white] ────── [bright_cyan]┌─ [bold bright_white]MEMORY STATUS[/bold bright_white] ──── [bright_cyan]┌─ [bold bright_white]SYSTEM METRICS[/bold bright_white][/bright_cyan]")
+        # Create single full-width status footer with proper alignment
+        lines.append(self._create_adaptive_border_top("SYSTEM STATUS"))
 
         # Color code device status
         device_status_color = "bright_green" if active_devices == total_devices else "orange3" if active_devices > 0 else "red"
@@ -2034,19 +2069,32 @@ class TTTopDisplay(Static):
         # Color code temperature
         temp_color = "red" if avg_temp > 80 else "orange3" if avg_temp > 65 else "bright_green"
 
-        lines.append(f"[bright_cyan]│[/bright_cyan] [bright_white]DEVICES:[/bright_white] [{device_status_color}]{active_devices}/{total_devices} ACTIVE[/{device_status_color}]     [bright_cyan]│[/bright_cyan] [bright_white]DDR TRAINED:[/bright_white] [{ddr_status_color}]{ddr_trained_count}/{total_devices}[/{ddr_status_color}]   [bright_cyan]│[/bright_cyan] [bright_white]TOTAL PWR:[/bright_white] [orange1]{total_power:5.1f}W[/orange1]")
-        lines.append(f"[bright_cyan]│[/bright_cyan] [bright_white]ARC HEARTBEATS:[/bright_white] [bright_green]{arc_status}[/bright_green]     [bright_cyan]│[/bright_cyan] [bright_white]CHANNELS:[/bright_white] [bright_cyan]ACTIVE[/bright_cyan]     [bright_cyan]│[/bright_cyan] [bright_white]AVG TEMP:[/bright_white] [{temp_color}]{avg_temp:5.1f}°C[/{temp_color}]")
-        lines.append(f"[bright_cyan]│[/bright_cyan] [bright_white]FRAMES:[/bright_white] [bright_magenta]{self.animation_frame:06d}[/bright_magenta]        [bright_cyan]│[/bright_cyan] [bright_white]REFRESH:[/bright_white] [bright_green]100ms[/bright_green]       [bright_cyan]│[/bright_cyan] [bright_white]AVG AICLK:[/bright_white] [bright_cyan]{avg_aiclk:4.0f}MHz[/bright_cyan]")
-        lines.append("[bright_cyan]└─────────────────────── └─────────────────── └──────────────────[/bright_cyan]")
+        # Line 1: Hardware status
+        lines.append(f"[bright_cyan]│[/bright_cyan] [bright_white]DEVICES:[/bright_white] [{device_status_color}]{active_devices}/{total_devices} ACTIVE[/{device_status_color}] [dim white]│[/dim white] [bright_white]DDR TRAINED:[/bright_white] [{ddr_status_color}]{ddr_trained_count}/{total_devices}[/{ddr_status_color}] [dim white]│[/dim white] [bright_white]TOTAL POWER:[/bright_white] [orange1]{total_power:5.1f}W[/orange1]")
+
+        # Line 2: Firmware and thermal
+        lines.append(f"[bright_cyan]│[/bright_cyan] [bright_white]ARC STATUS:[/bright_white] [bright_green]{arc_status}[/bright_green] [dim white]│[/dim white] [bright_white]AVG TEMP:[/bright_white] [{temp_color}]{avg_temp:5.1f}°C[/{temp_color}] [dim white]│[/dim white] [bright_white]AVG AICLK:[/bright_white] [bright_cyan]{avg_aiclk:4.0f}MHz[/bright_cyan]")
+
+        # Line 3: Frame counter and refresh rate
+        lines.append(f"[bright_cyan]│[/bright_cyan] [bright_white]FRAMES:[/bright_white] [bright_magenta]{self.animation_frame:06d}[/bright_magenta] [dim white]│[/dim white] [bright_white]REFRESH:[/bright_white] [bright_green]100ms[/bright_green] [dim white]│[/dim white] [bright_white]UPDATE RATE:[/bright_white] [bright_cyan]10 FPS[/bright_cyan]")
+
+        lines.append(self._create_adaptive_border_bottom())
 
         return lines
 
     def _create_bbs_heatmap_section(self) -> List[str]:
-        """Create BBS-style temporal heatmap with cyberpunk colors - borderless right side"""
+        """Create BBS-style temporal heatmap with cyberpunk colors - ADAPTIVE"""
         lines = []
-        lines.append("[bright_cyan]┌─────────── [bold bright_white]TEMPORAL ACTIVITY ANALYSIS[/bold bright_white][/bright_cyan]")
-        lines.append("[bright_cyan]│[/bright_cyan] [bright_white]DEVICE[/bright_white]     [bright_cyan]│[/bright_cyan] [bright_white]ACTIVITY HISTORY (LAST 60 SECONDS)[/bright_white]       [bright_cyan]│[/bright_cyan] [bright_white]NOW[/bright_white]")
-        lines.append("[bright_cyan]├────────────┼───────────────────────────────────────────┼─────[/bright_cyan]")
+        lines.append(self._create_adaptive_border_top("TEMPORAL ACTIVITY ANALYSIS"))
+
+        # Calculate available width for history
+        history_width = max(20, self.terminal_width - 30)  # Reserve space for labels
+        lines.append(f"[bright_cyan]│[/bright_cyan] [bright_white]DEVICE[/bright_white]     [bright_cyan]│[/bright_cyan] [bright_white]ACTIVITY HISTORY (LAST 60 SECONDS)[/bright_white]")
+
+        # Adaptive separator
+        sep1 = "─" * 10
+        sep2 = "─" * max(20, history_width)
+        lines.append(f"[bright_cyan]├{sep1}┼{sep2}[/bright_cyan]")
 
         chars = " ·∙▁▂▃▄▅▆▇█"
         # VIBRANT RAINBOW HEATMAP COLORS - cool to hot spectrum
@@ -2094,16 +2142,16 @@ class TTTopDisplay(Static):
             line = f"[bright_cyan]│[/bright_cyan] [bold bright_white]{device_name:10}[/bold bright_white] [bright_cyan]│[/bright_cyan] {heatmap} [bright_cyan]│[/bright_cyan] {current_indicator}"
             lines.append(line)
 
-        lines.append("[bright_cyan]│[/bright_cyan]            [bright_cyan]│[/bright_cyan] [dim bright_white]↑60s    ↑30s    ↑10s    ↑5s     ↑NOW[/dim bright_white]    [bright_cyan]│[/bright_cyan]")
-        lines.append("[bright_cyan]└────────────┴───────────────────────────────────────────┴─────[/bright_cyan]")
+        lines.append("[bright_cyan]│[/bright_cyan]            [bright_cyan]│[/bright_cyan] [dim bright_white]↑60s    ↑30s    ↑10s    ↑5s     ↑NOW[/dim bright_white]")
+        lines.append(self._create_adaptive_border_bottom())
         return lines
 
     def _create_bbs_interconnect_section(self) -> List[str]:
-        """Create BBS-style interconnect matrix with cyberpunk colors - borderless right side"""
+        """Create BBS-style interconnect matrix with cyberpunk colors - ADAPTIVE"""
         lines = []
 
-        # Borderless matrix with colors
-        lines.append("[bright_cyan]┌─────────────── [bold bright_white]INTERCONNECT BANDWIDTH MATRIX[/bold bright_white][/bright_cyan]")
+        # Adaptive matrix with colors
+        lines.append(self._create_adaptive_border_top("INTERCONNECT BANDWIDTH MATRIX"))
 
         # Device labels header with colors
         device_labels = [self.backend.get_device_name(d)[:8] for d in self.backend.devices]

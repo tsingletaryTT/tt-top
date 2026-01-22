@@ -21,6 +21,179 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 # Backend interface - works with JSONBackendAdapter or any compatible backend
 
+# Import the new unified chip art visualizer
+try:
+    from tt_top.unified_chip_art import UnifiedChipArt
+    UNIFIED_ART_AVAILABLE = True
+    print("✓ UnifiedChipArt loaded successfully!")
+except ImportError as e:
+    UnifiedChipArt = None
+    UNIFIED_ART_AVAILABLE = False
+    print(f"✗ UnifiedChipArt import failed: {e}")
+
+
+# ============================================================================
+# SAFE MARKUP HELPER FUNCTIONS - Make malformed tags impossible
+# ============================================================================
+
+class RichMarkupBuilder:
+    """
+    Safe Rich markup builder that ensures all tags are properly opened and closed.
+    This class makes it impossible to create malformed markup tags through proper
+    abstraction and validation.
+    """
+
+    # Valid Rich colors (no 'bold' or other styles)
+    VALID_COLORS = {
+        'bright_red', 'bright_yellow', 'bright_green', 'bright_cyan',
+        'bright_blue', 'bright_magenta', 'bright_white',
+        'red', 'yellow', 'green', 'cyan', 'blue', 'magenta', 'white',
+        'orange1', 'dim white', 'dim blue', 'dim red', 'dim yellow',
+        'dim green', 'dim cyan', 'dim magenta',
+    }
+
+    # Valid Rich styles (separate from colors)
+    VALID_STYLES = {'bold', 'italic', 'underline', 'dim'}
+
+    @staticmethod
+    def normalize_color(color_str: str) -> Tuple[Optional[str], List[str]]:
+        """
+        Normalize a color string like 'bold red' into (color, [styles]).
+
+        Args:
+            color_str: String like 'red', 'bold red', 'bright_cyan', 'dim white'
+
+        Returns:
+            Tuple of (color, [list of styles])
+
+        Examples:
+            'red' -> ('red', [])
+            'bold red' -> ('red', ['bold'])
+            'bright_cyan' -> ('bright_cyan', [])
+            'dim white' -> ('dim white', [])  # 'dim white' is a valid color name
+        """
+        if not color_str or color_str == ' ' or not isinstance(color_str, str):
+            return (None, [])
+
+        # DEFENSIVE: Check for any markup characters in the color string (corruption detection)
+        if '[' in color_str or ']' in color_str or '/' in color_str:
+            print(f"⚠️  WARNING: Corrupted color string detected: '{color_str}'")
+            return ('white', [])  # Safe fallback
+
+        # Check if it's a valid color as-is (including compound names like 'dim white')
+        if color_str in RichMarkupBuilder.VALID_COLORS:
+            return (color_str, [])
+
+        # Try splitting into style + color
+        parts = color_str.strip().split()
+        if len(parts) == 2:
+            style, color = parts
+            if style in RichMarkupBuilder.VALID_STYLES:
+                # Check if color is valid
+                if color in RichMarkupBuilder.VALID_COLORS:
+                    return (color, [style])
+                # Check if style + color forms a valid compound color
+                compound = f"{style} {color}"
+                if compound in RichMarkupBuilder.VALID_COLORS:
+                    return (compound, [])
+
+        # Try splitting differently for compound colors like 'bright_cyan'
+        if '_' in color_str:
+            prefix, suffix = color_str.split('_', 1)
+            # This is already a compound color name, return as-is if valid
+            if color_str in RichMarkupBuilder.VALID_COLORS:
+                return (color_str, [])
+
+        # Fallback: warn about unknown color and use safe default
+        print(f"⚠️  WARNING: Unknown color '{color_str}', using white as fallback")
+        return ('white', [])
+
+    @staticmethod
+    def open_tags(color: Optional[str], styles: List[str]) -> str:
+        """
+        Create opening tags for color and styles.
+
+        Args:
+            color: Color name (e.g., 'red', 'bright_cyan', 'dim white')
+            styles: List of style names (e.g., ['bold'], ['bold', 'italic'])
+
+        Returns:
+            Opening tag string (e.g., '[bold][red]', '[bright_cyan]', '[dim white]')
+        """
+        tags = []
+
+        # Open styles first (outermost)
+        for style in styles:
+            tags.append(f'[{style}]')
+
+        # Then open color (innermost)
+        if color:
+            tags.append(f'[{color}]')
+
+        return ''.join(tags)
+
+    @staticmethod
+    def close_tags(color: Optional[str], styles: List[str]) -> str:
+        """
+        Create closing tags for color and styles (in reverse order).
+
+        Args:
+            color: Color name
+            styles: List of style names
+
+        Returns:
+            Closing tag string (e.g., '[/red][/bold]', '[/bright_cyan]')
+        """
+        tags = []
+
+        # Close color first (innermost closed first)
+        if color:
+            tags.append(f'[/{color}]')
+
+        # Then close styles in reverse order (outermost closed last)
+        for style in reversed(styles):
+            tags.append(f'[/{style}]')
+
+        return ''.join(tags)
+
+    @staticmethod
+    def wrap(text: str, color_str: str) -> str:
+        """
+        Safely wrap text in color/style markup.
+
+        Args:
+            text: Text to wrap
+            color_str: Color string like 'red', 'bold red', 'bright_cyan'
+
+        Returns:
+            Markup string with properly nested tags
+
+        Examples:
+            wrap('hello', 'red') -> '[red]hello[/red]'
+            wrap('hello', 'bold red') -> '[bold][red]hello[/red][/bold]'
+            wrap('hello', 'bright_cyan') -> '[bright_cyan]hello[/bright_cyan]'
+        """
+        if not text:
+            return ''
+
+        color, styles = RichMarkupBuilder.normalize_color(color_str)
+
+        if not color and not styles:
+            return text
+
+        open_tags = RichMarkupBuilder.open_tags(color, styles)
+        close_tags = RichMarkupBuilder.close_tags(color, styles)
+
+        return f'{open_tags}{text}{close_tags}'
+
+
+def safe_markup_wrap(text: str, color_str: str) -> str:
+    """
+    Convenient wrapper for RichMarkupBuilder.wrap().
+    Use this function everywhere instead of manual string formatting.
+    """
+    return RichMarkupBuilder.wrap(text, color_str)
+
 
 def generate_leet_hello_world_ascii(frame: int = 0, width: int = 80, hardware_data: Dict = None) -> List[str]:
     """
@@ -591,7 +764,7 @@ class HardwareStarfield:
                 else:
                     self.show_hello_text = False
                     print("📊 Celebration only - Hello threshold not reached")
-        
+
         # Update celebration frame counter if celebrating
         if self.workload_detected:
             self.workload_celebration_frame += 1
@@ -697,15 +870,31 @@ class HardwareStarfield:
 
                     star['brightness'] = 0.4 + activity * 0.6
 
-                    # Planet colors intensify with activity
+                    # Planet colors intensify with activity - SAFE color assignment
                     if activity > 0.3:
-                        # Use proper compound color name instead of string concatenation
-                        color_part = base_color.split("_")[1] if "_" in base_color else base_color
-                        star['color'] = f'bold {color_part}'
+                        # High activity: use bold + base color (e.g., 'bold red')
+                        # Extract just the color part without 'bright_' prefix
+                        if base_color.startswith('bright_'):
+                            color_only = base_color.replace('bright_', '')
+                            star['color'] = f'bold {color_only}'
+                        else:
+                            star['color'] = f'bold {base_color}'
                     elif activity > 0.1:
+                        # Medium activity: use base color as-is
                         star['color'] = base_color
                     else:
-                        star['color'] = base_color.replace('bright_', 'dim ')
+                        # Low activity: use dimmed version
+                        # Map bright colors to their dim equivalents
+                        dim_map = {
+                            'bright_blue': 'blue',
+                            'bright_yellow': 'yellow',
+                            'bright_red': 'red',
+                            'bright_cyan': 'cyan',
+                            'bright_green': 'green',
+                            'bright_magenta': 'magenta',
+                            'bright_white': 'white',
+                        }
+                        star['color'] = dim_map.get(base_color, 'dim white')
 
                     star['twinkle_speed'] = 0.02 + activity * 0.15
                 else:
@@ -748,12 +937,24 @@ class HardwareStarfield:
             if star['twinkle_phase'] > 2 * math.pi:
                 star['twinkle_phase'] -= 2 * math.pi
 
+            # DEFENSIVE: Validate color value (detect corruption early)
+            if 'color' in star:
+                color_value = star['color']
+                if not isinstance(color_value, str):
+                    print(f"⚠️  Star {star.get('id', '?')} has non-string color: {type(color_value)}")
+                    star['color'] = 'white'
+                elif '[' in color_value or ']' in color_value:
+                    print(f"⚠️  Star {star.get('id', '?')} has corrupted color: '{color_value}'")
+                    star['color'] = 'white'
+
     def render_starfield(self) -> List[str]:
         """Render the hardware-responsive starfield to ASCII art
 
         Creates a colorful display where each position represents actual
         hardware component state. The resulting art is both beautiful and
         informationally dense.
+
+        Uses safe markup builder to ensure all tags are properly nested.
         """
         # Initialize blank field
         field = [[' ' for _ in range(self.width)] for _ in range(self.height)]
@@ -827,46 +1028,61 @@ class HardwareStarfield:
             field[y][x] = char
             color_field[y][x] = star['color']
 
-        # Convert to markup strings
+        # Convert to markup strings using SAFE markup builder with error handling
         lines = []
         for row_idx, (char_row, color_row) in enumerate(zip(field, color_field)):
-            line_parts = []
-            current_color = None
+            try:
+                line_parts = []
+                current_color_str = None
+                current_color = None
+                current_styles = []
 
-            for char, color in zip(char_row, color_row):
-                if color != current_color:
-                    # Close previous color/bold tags
-                    if current_color is not None:
-                        if current_color.startswith('bold '):
-                            base_color = current_color.replace('bold ', '')
-                            line_parts.append(f'[/{base_color}]')
-                            line_parts.append('[/bold]')
-                        else:
-                            line_parts.append(f'[/{current_color}]')
+                for col_idx, (char, color_str) in enumerate(zip(char_row, color_row)):
+                    try:
+                        if color_str != current_color_str:
+                            # Close previous color/style tags using safe builder
+                            if current_color_str is not None:
+                                close_tags = RichMarkupBuilder.close_tags(current_color, current_styles)
+                                line_parts.append(close_tags)
 
-                    # Open new color/bold tags
-                    if char != ' ':  # Don't add color markup for spaces
-                        if color.startswith('bold '):
-                            base_color = color.replace('bold ', '')
-                            line_parts.append('[bold]')
-                            line_parts.append(f'[{base_color}]')
-                        else:
-                            line_parts.append(f'[{color}]')
-                        current_color = color
-                    else:
-                        current_color = None
-                line_parts.append(char)
+                            # Open new color/style tags using safe builder
+                            if char != ' ':  # Don't add color markup for spaces
+                                current_color_str = color_str
+                                current_color, current_styles = RichMarkupBuilder.normalize_color(color_str)
+                                open_tags = RichMarkupBuilder.open_tags(current_color, current_styles)
+                                line_parts.append(open_tags)
+                            else:
+                                current_color_str = None
+                                current_color = None
+                                current_styles = []
 
-            # Close final color tag if needed
-            if current_color is not None:
-                if current_color.startswith('bold '):
-                    base_color = current_color.replace('bold ', '')
-                    line_parts.append(f'[/{base_color}]')
-                    line_parts.append('[/bold]')
-                else:
-                    line_parts.append(f'[/{current_color}]')
+                        line_parts.append(char)
+                    except Exception as e:
+                        # Character-level error - log and skip this character
+                        print(f"⚠️  Error at row {row_idx}, col {col_idx}: {e}")
+                        print(f"    char='{char}', color_str='{color_str}'")
+                        line_parts.append(' ')  # Safe fallback
 
-            lines.append(''.join(line_parts))
+                # Close final color tag if needed using safe builder
+                if current_color_str is not None:
+                    close_tags = RichMarkupBuilder.close_tags(current_color, current_styles)
+                    line_parts.append(close_tags)
+
+                line_str = ''.join(line_parts)
+
+                # DEFENSIVE: Check for malformed tags in the final line
+                if '[/' in line_str and ('[/[' in line_str or '[[' in line_str):
+                    print(f"⚠️  WARNING: Potentially malformed line {row_idx} detected!")
+                    print(f"    Line preview: {line_str[:100]}...")
+                    # Try to sanitize by removing all markup
+                    line_str = ''.join(char_row)  # Fallback to plain text
+
+                lines.append(line_str)
+
+            except Exception as e:
+                # Line-level error - log and use fallback
+                print(f"⚠️  Error rendering line {row_idx}: {e}")
+                lines.append(''.join(char_row))  # Fallback to plain text line
 
         return lines
 
@@ -930,15 +1146,17 @@ class HardwareStarfield:
             pulse_intensity = abs(math.sin(self.workload_celebration_frame * pulse_rate))
             use_bold = pulse_intensity > pulse_threshold
 
-            # Create the colored line with proper Rich markup nesting
+            # Create the colored line with proper Rich markup using SAFE wrapper
             if art_line.strip():  # Only color non-empty lines
                 if use_bold:
-                    colored_line = f'[bold][{line_color}]{art_line}[/{line_color}][/bold]'
+                    # Use bold + color
+                    colored_line = safe_markup_wrap(art_line, f'bold {line_color}')
                 else:
-                    colored_line = f'[{line_color}]{art_line}[/{line_color}]'
+                    # Use color only
+                    colored_line = safe_markup_wrap(art_line, line_color)
             else:
                 colored_line = art_line
-                
+
             lines.append(colored_line)
         
         # Add padding lines at bottom
@@ -1015,16 +1233,25 @@ class HardwareStarfield:
     def _add_celebration_particles(self, base_lines: List[str]) -> List[str]:
         """
         Add animated particle effects over the celebration display
-        
+
+        CRITICAL: This function is DISABLED because it causes the same markup
+        corruption as render_streams() - it splits marked-up strings into
+        character arrays, corrupting existing markup tags.
+
         Args:
             base_lines: Base lines to add particles to
-            
+
         Returns:
-            Modified lines with particle effects
+            Base lines unmodified (particles disabled for safety)
         """
+        # DISABLED FOR SAFETY - Return base lines unmodified
+        return list(base_lines)  # Return copy
+
+        # OLD BUGGY CODE BELOW (commented out):
         enhanced_lines = []
-        
+
         for line_idx, line in enumerate(base_lines):
+            # BUG: This splits markup tags into individual characters!
             line_chars = list(line) if isinstance(line, str) else [' '] * self.width
             
             # Add random celebration particles
@@ -1055,11 +1282,12 @@ class HardwareStarfield:
                 if random.random() < particle_density:
                     particle = random.choice(particles)
                     particle_color = random.choice(particle_colors)
-                    
+
                     # Only add particle if position is empty (space)
                     if char_idx < len(line_chars) and line_chars[char_idx] == ' ':
-                        line_chars[char_idx] = f'[{particle_color}]{particle}[/{particle_color}]'
-            
+                        # Use safe markup wrapper for particles
+                        line_chars[char_idx] = safe_markup_wrap(particle, particle_color)
+
             enhanced_lines.append(''.join(line_chars))
         
         return enhanced_lines
@@ -1124,57 +1352,30 @@ class FlowingDataStreams:
                     continue
 
     def render_streams(self, base_field: List[str]) -> List[str]:
-        """Render flowing data streams over the base starfield"""
-        lines = list(base_field)  # Copy base field
+        """Render flowing data streams over the base starfield
 
-        for stream in self.streams:
-            y = stream['y']
-            if not (0 <= y < len(lines)):
-                continue
+        CRITICAL: This function is DISABLED because it causes markup corruption
+        when overlaying new markup on lines that already contain Rich markup tags.
 
-            start_x = stream['start_x']
-            end_x = stream['end_x']
-            intensity = stream['intensity']
-            phase = stream['phase']
+        The issue: list(line_with_markup) splits markup tags like [/bright_cyan]
+        into individual characters, then inserting at position X can split a tag
+        in the middle, creating corruption like [/brigh[new_tag]t_cyan].
 
-            # Create flowing pattern
-            stream_length = abs(end_x - start_x)
-            if stream_length == 0:
-                continue
+        Solution: Return base_field unmodified for now. Streams would need to be
+        rendered in visual space, not character space, to work safely.
+        """
+        # DISABLED FOR SAFETY - Return base field unmodified
+        return list(base_field)  # Return copy to avoid side effects
 
-            flow_chars = ['·', '▸', '▶', '▶', '▸', '·'] if stream['direction'] > 0 else ['·', '◂', '◀', '◀', '◂', '·']
-            pattern_length = len(flow_chars)
-
-            # Determine color based on intensity (adjusted for real hardware)
-            if intensity > 0.4:  # Lower thresholds for real hardware
-                stream_color = 'bright_white'
-            elif intensity > 0.25:
-                stream_color = 'bright_yellow'
-            elif intensity > 0.1:
-                stream_color = 'orange1'
-            else:
-                stream_color = 'bright_cyan'
-
-            # Build the stream line
-            line_chars = list(lines[y]) if y < len(lines) else [' '] * self.width
-
-            for offset in range(0, stream_length, 2):  # Sample every 2 characters
-                x = start_x + offset if stream['direction'] > 0 else start_x - offset
-                if not (0 <= x < len(line_chars)):
-                    continue
-
-                # Calculate which flow character to use based on phase
-                pattern_pos = int((offset / 2 + phase) % pattern_length)
-                flow_char = flow_chars[pattern_pos]
-
-                # Only place character if it's not a space/dot or if it would overwrite a space
-                if flow_char not in ' ·' or line_chars[x] == ' ':
-                    # Insert colored character
-                    line_chars[x] = f'[{stream_color}]{flow_char}[/{stream_color}]'
-
-            lines[y] = ''.join(line_chars)
-
-        return lines
+        # OLD BUGGY CODE COMMENTED OUT:
+        # lines = list(base_field)
+        # for stream in self.streams:
+        #     y = stream['y']
+        #     ...
+        #     line_chars = list(lines[y])  # BUG: Splits markup tags!
+        #     line_chars[x] = safe_markup_wrap(...)  # BUG: Corrupts existing markup!
+        #     lines[y] = ''.join(line_chars)
+        # return lines
 
 
 class HardwareResponsiveASCII(Static):
@@ -1202,19 +1403,33 @@ class HardwareResponsiveASCII(Static):
         self.display_width = 120
         self.display_height = 40
 
-        # Initialize animation systems
-        self.starfield = HardwareStarfield(self.display_width, self.display_height)
-        self.data_streams = FlowingDataStreams(self.display_width, self.display_height)
+        # Initialize animation systems - USE NEW UNIFIED CHIP ART!
+        if UNIFIED_ART_AVAILABLE:
+            print(f"🎨 Initializing UNIFIED CHIP ART visualizer")
+            self.unified_art = UnifiedChipArt(self.display_width, self.display_height)
+            self.use_unified_art = True
+            print(f"✓ use_unified_art = {self.use_unified_art}")
+        else:
+            # Fallback to old starfield if unified art not available
+            print(f"⭐ Falling back to STARFIELD visualizer")
+            self.starfield = HardwareStarfield(self.display_width, self.display_height)
+            self.data_streams = FlowingDataStreams(self.display_width, self.display_height)
+            self.use_unified_art = False
+            print(f"✓ use_unified_art = {self.use_unified_art}")
 
     def on_mount(self) -> None:
         """Initialize hardware-responsive animation systems"""
-        # Get actual display size with fallback
+        # Get FULL terminal size - we want to take over completely!
         self.display_width = max(self.size.width, 80) if hasattr(self, 'size') and self.size else 80
-        self.display_height = max(self.size.height - 2, 25) if hasattr(self, 'size') and self.size else 25
+        self.display_height = max(self.size.height, 25) if hasattr(self, 'size') and self.size else 25
+
+        print(f"📐 Terminal size: {self.display_width} × {self.display_height}")
 
         # DEBUG: Show initialization info
+        viz_type = "UNIFIED CHIP ART" if UNIFIED_ART_AVAILABLE else "STARFIELD"
         init_debug = f"""
 [bright_yellow]INITIALIZING HARDWARE VISUALIZATION[/bright_yellow]
+Visualizer: {viz_type}
 Display Size: {self.display_width} x {self.display_height}
 Backend Devices: {len(self.backend.devices)}
 Initialization: Starting...
@@ -1222,20 +1437,39 @@ Initialization: Starting...
         self.update(init_debug)
 
         # Reinitialize systems with correct size
-        self.starfield = HardwareStarfield(self.display_width, self.display_height)
-        self.data_streams = FlowingDataStreams(self.display_width, self.display_height)
+        if UNIFIED_ART_AVAILABLE:
+            self.unified_art = UnifiedChipArt(self.display_width, self.display_height)
+            self.use_unified_art = True
+            init_debug += f"Unified Chip Art Visualizer initialized\n"
+        else:
+            self.starfield = HardwareStarfield(self.display_width, self.display_height)
+            self.data_streams = FlowingDataStreams(self.display_width, self.display_height)
+            self.use_unified_art = False
 
-        # Initialize starfield based on actual hardware
-        try:
-            self.starfield.initialize_stars(self.backend)
-            init_debug += f"Stars: {len(self.starfield.stars)} created\n"
-        except Exception as e:
-            init_debug += f"Star creation error: {e}\n"
+            # Initialize starfield based on actual hardware
+            try:
+                self.starfield.initialize_stars(self.backend)
+                init_debug += f"Stars: {len(self.starfield.stars)} created\n"
+            except Exception as e:
+                init_debug += f"Star creation error: {e}\n"
 
         self.update(init_debug + "[green]Starting animation loop...[/green]")
 
         # Start animation loop
         self.set_interval(0.1, self._update_animation)  # 10 FPS for smooth animation
+
+    def on_resize(self, event) -> None:
+        """Handle terminal resize - stay adaptive!"""
+        old_width, old_height = self.display_width, self.display_height
+        self.display_width = max(event.size.width, 80)
+        self.display_height = max(event.size.height, 25)
+
+        print(f"📐 Terminal resized: {old_width}×{old_height} → {self.display_width}×{self.display_height}")
+
+        # Update visualizer with new size
+        if self.use_unified_art and hasattr(self, 'unified_art'):
+            self.unified_art.resize(self.display_width, self.display_height)
+            print(f"✓ Unified art resized to {self.display_width}×{self.display_height}")
 
     def _update_animation(self) -> None:
         """Update animation frame with hardware-responsive data"""
@@ -1244,22 +1478,20 @@ Initialization: Starting...
             self.backend.update_telem()
             self.frame_count += 1
 
-            # Update animation systems with real hardware data
-            self.starfield.update_from_telemetry(self.backend, self.frame_count)
-            self.data_streams.update_streams(self.backend, self.frame_count)
-
-            # Render the complete visualization
-            content = self._render_complete_visualization()
-
-            # DEBUG: Add content length info at start of content
-            content_lines = content.split('\n')
-            debug_info = f"[dim white]DEBUG: {len(content_lines)} lines, {len(content)} chars, Frame {self.frame_count}[/dim white]"
-
-            # Insert debug info after header
-            lines = content.split('\n')
-            if len(lines) > 5:  # After header
-                lines.insert(5, debug_info)
+            if self.use_unified_art:
+                # NEW: Use unified chip art visualizer
+                if self.frame_count % 100 == 1:  # Debug every 100 frames
+                    print(f"🎨 Frame {self.frame_count}: Using UNIFIED CHIP ART visualizer")
+                self.unified_art.update(self.backend, self.frame_count)
+                lines = self.unified_art.render(self.backend)
                 content = '\n'.join(lines)
+            else:
+                # OLD: Use starfield (fallback)
+                if self.frame_count % 100 == 1:
+                    print(f"⭐ Frame {self.frame_count}: Using STARFIELD visualizer")
+                self.starfield.update_from_telemetry(self.backend, self.frame_count)
+                self.data_streams.update_streams(self.backend, self.frame_count)
+                content = self._render_complete_visualization()
 
             self.update(content)
 
@@ -1458,7 +1690,12 @@ Press 'v' to exit visualization mode
                     power_change = ((total_power - baseline_total_power) / baseline_total_power * 100) if baseline_total_power > 0 else 0
                     current_change = ((total_current - baseline_total_current) / baseline_total_current * 100) if baseline_total_current > 0 else 0
 
-                    change_info = f"[bright_white]Δ Power:[/bright_white] [{'bright_green' if power_change >= 0 else 'orange1'}]{power_change:+5.1f}%[/{'bright_green' if power_change >= 0 else 'orange1'}] [dim white]│[/dim white] [bright_white]Δ Current:[/bright_white] [{'bright_green' if current_change >= 0 else 'orange1'}]{current_change:+5.1f}%[/{'bright_green' if current_change >= 0 else 'orange1'}]"
+                    # Evaluate colors first, then use safe markup wrapper
+                    power_color = 'bright_green' if power_change >= 0 else 'orange1'
+                    current_color = 'bright_green' if current_change >= 0 else 'orange1'
+                    power_text = safe_markup_wrap(f"{power_change:+5.1f}%", power_color)
+                    current_text = safe_markup_wrap(f"{current_change:+5.1f}%", current_color)
+                    change_info = f"[bright_white]Δ Power:[/bright_white] {power_text} [dim white]│[/dim white] [bright_white]Δ Current:[/bright_white] {current_text}"
                 else:
                     change_info = "[dim white]No devices detected[/dim white]"
             else:
@@ -1470,7 +1707,9 @@ Press 'v' to exit visualization mode
             change_info = "[dim white]Starting visualization...[/dim white]"
 
         lines.append(f"[bright_cyan]╔═══════════════════════════════════════════════════════════════════════════════════════════╗[/bright_cyan]")
-        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_magenta]{pulse_char}[/bold bright_magenta] [bold bright_white]ADAPTIVE HARDWARE VISUALIZATION[/bold bright_white] [dim white]│[/dim white] [{status_color}]{status_text}[/{status_color}] [dim white]│[/dim white] [bright_white]Devices:[/bright_white] {total_devices} [bright_cyan]║[/bright_cyan]")
+        # Use safe markup wrapper for status color
+        status_colored = safe_markup_wrap(status_text, status_color)
+        lines.append(f"[bright_cyan]║[/bright_cyan] [bold bright_magenta]{pulse_char}[/bold bright_magenta] [bold bright_white]ADAPTIVE HARDWARE VISUALIZATION[/bold bright_white] [dim white]│[/dim white] {status_colored} [dim white]│[/dim white] [bright_white]Devices:[/bright_white] {total_devices} [bright_cyan]║[/bright_cyan]")
         lines.append(f"[bright_cyan]║[/bright_cyan] {baseline_status} [dim white]│[/dim white] {change_info}")
         lines.append(f"[bright_cyan]║[/bright_cyan] [bright_white]Absolute:[/bright_white] [orange1]{total_power:5.1f}W[/orange1] [bright_green]{total_current:5.1f}A[/bright_green] [bright_yellow]{avg_temp:4.1f}°C[/bright_yellow] [dim white]│[/dim white] [bright_white]Frame:[/bright_white] [bright_magenta]{self.frame_count}[/bright_magenta] [bright_cyan]║[/bright_cyan]")
         lines.append(f"[bright_cyan]╚═══════════════════════════════════════════════════════════════════════════════════════════╝[/bright_cyan]")
@@ -1527,10 +1766,10 @@ Press 'v' to exit visualization mode
             # Get ASCII art for this letter
             art_lines = ascii_letters[letter]
 
-            # Add colored version of each line
-            line1_parts.append(f'[{color}]{art_lines[0]}[/{color}]')
-            line2_parts.append(f'[{color}]{art_lines[1]}[/{color}]')
-            line3_parts.append(f'[{color}]{art_lines[2]}[/{color}]')
+            # Add colored version of each line using safe markup wrapper
+            line1_parts.append(safe_markup_wrap(art_lines[0], color))
+            line2_parts.append(safe_markup_wrap(art_lines[1], color))
+            line3_parts.append(safe_markup_wrap(art_lines[2], color))
 
             # Add spacing between letters (except after !)
             if letter != '!':
